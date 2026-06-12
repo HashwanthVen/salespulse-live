@@ -105,6 +105,7 @@
           <div class="k-note">${esc(k.note)}</div>
           ${whisper}
           ${yoyWhisper}
+          ${kpiBenchmarkWhisper(k.label)}
         </div>`;
     }).join("");
     grid.innerHTML = baseTiles + renderConcentrationTile();
@@ -1236,6 +1237,117 @@
     return `REACH risk: ${top.account} ($${amt}M) is single-threaded — only ${reachEngagedCount(top)} stakeholder${reachEngagedCount(top) === 1 ? "" : "s"} engaged. Single-threaded deals win ~18% vs ~47% for ≥5 stakeholders (Gartner 2024). Action: schedule an exec-sponsor intro this week.`;
   }
 
+  /* ---------- BENCHMARKS (#30) ----------
+     External Pavilion-style quartile placement for every KPI: turns the
+     internal-only "is it changing?" dashboard into an external-context
+     "are we good?" dashboard. Renders an 8-chip strip + BENCHMARK INDEX
+     under KPI DESK, and a third-line whisper under each KPI tile that
+     has a benchmark mapping. */
+  function benchStatusBand(pct) {
+    if (pct >= 75) return { cls: "strong", glyph: "★", word: "top-quartile" };
+    if (pct >= 50) return { cls: "ok",     glyph: "●", word: "above median" };
+    if (pct >= 40) return { cls: "ok",     glyph: "●", word: "at median" };
+    if (pct >= 25) return { cls: "amber",  glyph: "⚠", word: "below median" };
+    return                  { cls: "red",   glyph: "⛔", word: "bottom-quartile" };
+  }
+  function benchFormatQuartile(v, fmt) {
+    if (fmt === "pct")  return (v * 100).toFixed(0) + "%";
+    if (fmt === "days") return v + "d";
+    if (fmt === "k")    return "$" + v + "K";
+    if (fmt === "x")    return v.toFixed(1) + "x";
+    return String(v);
+  }
+  function benchKpiOursMismatch(b) {
+    // Looks up the live KPI value matching this benchmark's kpiKey and
+    // reports drift > 0.5% so the user knows the benchmark chip is in
+    // sync with what's rendered in the KPI tile.
+    if (!b.kpiKey) return null;
+    const k = (D.kpis || []).find((x) => x.label === b.kpiKey);
+    if (!k) return null;
+    const num = parseFloat(String(k.value).replace(/[^0-9.\-]/g, ""));
+    if (isNaN(num)) return null;
+    let oursAsKpi = b.ours;
+    if (b.fmt === "pct") oursAsKpi = b.ours * 100;
+    else if (b.fmt === "k") oursAsKpi = b.ours;
+    const drift = Math.abs(num - oursAsKpi) / Math.max(0.0001, Math.abs(oursAsKpi));
+    return drift > 0.005 ? { live: k.value, benchOurs: b.ourLabel } : null;
+  }
+  function renderBenchmarks() {
+    const strip = $("bench-strip");
+    if (!strip || !D.benchmarks || !D.benchmarks.kpis) return;
+    const kpis = D.benchmarks.kpis;
+    const keys = Object.keys(kpis);
+    const chips = keys.map((k) => {
+      const b   = kpis[k];
+      const band = benchStatusBand(b.pct);
+      const q25  = benchFormatQuartile(b.p25, b.fmt);
+      const q50  = benchFormatQuartile(b.p50, b.fmt);
+      const q75  = benchFormatQuartile(b.p75, b.fmt);
+      const arrow = b.hib ? "↑" : "↓";
+      const mm    = benchKpiOursMismatch(b);
+      const mmChip = mm
+        ? ` <span class="bench-mismatch" title="Benchmark chip ours=${esc(b.ourLabel)} but live KPI=${esc(mm.live)}">⚠</span>`
+        : "";
+      const tip = `${b.label} — Pavilion P25=${q25} · P50=${q50} · P75=${q75} (${b.hib ? "higher is better" : "lower is better"})\nOur ${b.ourLabel} → P${b.pct} ${band.word}`;
+      return `<button type="button" class="bench-chip ${band.cls}" data-bench-key="${esc(k)}" title="${esc(tip)}">`
+           + `<span class="bench-chip-label">${esc(b.label)}</span>`
+           + `<span class="bench-chip-our">${esc(b.ourLabel)}</span>`
+           + `<span class="bench-chip-pct">P${b.pct} ${band.glyph}</span>${mmChip}`
+           + `</button>`;
+    }).join("");
+    strip.innerHTML = chips;
+    // BENCHMARK INDEX
+    const indexEl = $("bench-index");
+    if (indexEl) {
+      const avg = keys.reduce((s, k) => s + kpis[k].pct, 0) / keys.length;
+      const band = benchStatusBand(avg);
+      indexEl.innerHTML = `<span class="bench-index-pill ${band.cls}" title="Average percentile placement across ${keys.length} KPIs">INDEX <b>${avg.toFixed(0)}/100</b> · P${avg.toFixed(0)} ${band.glyph}</span>`;
+    }
+    // Source caption: clickable to reveal "About this benchmark" drawer.
+    const sub = $("bench-sub");
+    const src = $("bench-source");
+    if (sub && src) {
+      sub.style.cursor = "pointer";
+      sub.title = "Click for benchmark methodology";
+      sub.onclick = () => {
+        if (src.hasAttribute("hidden")) {
+          src.removeAttribute("hidden");
+          src.innerHTML = `<b>About this benchmark.</b> Source: ${esc(D.benchmarks.source)} · As-of ${esc(D.benchmarks.asOf)} · Sample N=${D.benchmarks.sampleN} mid-market SaaS companies. Quartile values (P25/P50/P75) are <i>mocked for demo</i> — Pavilion publishes real benchmarks for subscribers; this dashboard replaces them at deploy time. <span class="bench-source-url">${esc(D.benchmarks.sourceUrl || "")}</span>`;
+        } else {
+          src.setAttribute("hidden", "");
+        }
+      };
+    }
+    // Chip clicks: highlight-pulse the chip + scroll into view.
+    strip.querySelectorAll(".bench-chip").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        btn.classList.remove("bench-pulse");
+        void btn.offsetWidth; // restart animation
+        btn.classList.add("bench-pulse");
+        const panel = $("benchmarks");
+        if (panel && panel.scrollIntoView) panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      });
+    });
+  }
+  function kpiBenchmarkWhisper(label) {
+    // Returns a third-line whisper HTML string for the KPI tile whose
+    // label matches a benchmark.kpiKey. Returns "" when no match.
+    if (!D.benchmarks || !D.benchmarks.kpis) return "";
+    const entry = Object.values(D.benchmarks.kpis).find((b) => b.kpiKey === label);
+    if (!entry) return "";
+    const band = benchStatusBand(entry.pct);
+    return `<div class="k-whisper k-whisper-bench ${band.cls}" title="Pavilion SaaS ${entry.label} — P25=${benchFormatQuartile(entry.p25, entry.fmt)} · P50=${benchFormatQuartile(entry.p50, entry.fmt)} · P75=${benchFormatQuartile(entry.p75, entry.fmt)}">BENCH: <b>P${entry.pct}</b> · ${esc(band.word)} ${band.glyph}</div>`;
+  }
+  function benchmarkInsightBullet() {
+    if (!D.benchmarks || !D.benchmarks.kpis) return null;
+    const kpis  = D.benchmarks.kpis;
+    const list  = Object.values(kpis);
+    const top   = list.slice().sort((a, b) => b.pct - a.pct)[0];
+    const worst = list.slice().sort((a, b) => a.pct - b.pct)[0];
+    if (!top || !worst) return null;
+    return `BENCH: top-quartile on ${top.label.toLowerCase()} (${top.ourLabel} vs P75=${benchFormatQuartile(top.p75, top.fmt)}). Below-median on ${worst.label.toLowerCase()} (${worst.ourLabel} vs P50=${benchFormatQuartile(worst.p50, worst.fmt)}) — the single highest-leverage gap. Source: Pavilion SaaS Operator Benchmarks, mid-mkt $50-100M ARR, N=${D.benchmarks.sampleN}.`;
+  }
+
   function renderDeals(rows) {
     const tbody = $("deals-tbody");
     if (!tbody) return;
@@ -2145,6 +2257,10 @@
       const rb = reachInsightBullet();
       if (rb) items.unshift(rb);
     } catch (e) {}
+    try {
+      const bb = benchmarkInsightBullet();
+      if (bb) items.unshift(bb);
+    } catch (e) {}
     list.innerHTML = items.map((s) => `<li>${esc(s)}</li>`).join("");
   }
   function bindRegen() {
@@ -2746,7 +2862,8 @@
       "GO RISK": "at-risk-reps", "GO ATRISK": "at-risk-reps", "GO COACH": "at-risk-reps",
       "GO AUD": "audience", "GO AUDIENCE": "audience",
       "GO NOTES": "release",
-      "GO WL": "winloss", "GO WINLOSS": "winloss", "GO WIN": "winloss"
+      "GO WL": "winloss", "GO WINLOSS": "winloss", "GO WIN": "winloss",
+      "GO BENCH": "benchmarks", "GO BENCHMARKS": "benchmarks"
     };
     if (goMap[cmd]) { const el = document.getElementById(goMap[cmd]); if (el) el.scrollIntoView({ behavior: "smooth", block: "start" }); return; }
     if (cmd === "FCST COMMIT" || cmd === "FORECAST COMMIT") { setSeries("commit"); return; }
@@ -2910,16 +3027,16 @@
   // Each value = the set of panel IDs visible for that persona. "full" = null
   // means everything visible (no hide rules emitted).
   const LENS_MAP = {
-    cro:   new Set(["inbox","dashboard","forecast","changed","yoy","forward-cov","at-risk-reps","slippage","winloss","insights","audience","release"]),
+    cro:   new Set(["inbox","dashboard","benchmarks","forecast","changed","yoy","forward-cov","at-risk-reps","slippage","winloss","insights","audience","release"]),
     mgr:   new Set(["inbox","dashboard","funnel","deals","reps","at-risk-reps","slippage","changed","winloss","insights","release"]),
     ae:    new Set(["inbox","dashboard","deals","insights","release"]),
-    cfo:   new Set(["dashboard","forecast","yoy","slippage","winloss","release"]),
-    cmo:   new Set(["dashboard","pipegen","funnel","segments","winloss","insights","release"]),
-    board: new Set(["dashboard","forecast","yoy","winloss","insights","release"]),
+    cfo:   new Set(["dashboard","benchmarks","forecast","yoy","slippage","winloss","release"]),
+    cmo:   new Set(["dashboard","benchmarks","pipegen","funnel","segments","winloss","insights","release"]),
+    board: new Set(["dashboard","benchmarks","forecast","yoy","winloss","insights","release"]),
     full:  null
   };
   const ALL_PANEL_IDS = [
-    "inbox","changed","yoy","dashboard","funnel","forecast","deals","slippage",
+    "inbox","changed","yoy","dashboard","benchmarks","funnel","forecast","deals","slippage",
     "pipegen","forward-cov","at-risk-reps","reps","segments","winloss","risks","insights","audience","release"
   ];
   const LENS_SHORTCUT_ORDER = ["cro","mgr","ae","cfo","cmo","board","full"];
@@ -3064,6 +3181,7 @@
     renderTicker();
     tickClock(); setInterval(tickClock, 1000);
     renderKpis();
+    renderBenchmarks();
     renderChanged();
     renderYoyPanel();
     applyChangedBasis();

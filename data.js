@@ -120,6 +120,32 @@ window.SALESPULSE_DATA = {
     forecastAccuracy: 0.07
   },
 
+  /* External BENCHMARKS (#30) — every internal KPI placed vs an industry
+     P25 / P50 / P75 quartile so the CFO / Board / CMO conversation can move
+     from "is it changing?" (#10 WoW, #22 YoY) to "are we good?". MOCK DATA:
+     Pavilion publishes real Operator Benchmarks but specific values here are
+     illustrative for the demo. Replace with actual Pavilion subscriber data
+     in production. The `hib` flag is "higher-is-better" — false for
+     forecastAccuracy and salesCycleDays where lower = top-quartile, so the
+     ★ glyph + percentile must invert in the renderer. `pct` is the
+     pre-computed percentile placement (0-100) used by the chip + INDEX.  */
+  benchmarks: {
+    source:    "Pavilion SaaS Operator Benchmarks (Mid-Market $50-100M ARR cohort)",
+    sourceUrl: "https://www.joinpavilion.com/benchmarks",
+    asOf:      "2024-Q4",
+    sampleN:   312,
+    kpis: {
+      winRate:           { label: "WIN RATE",    p25: 0.21, p50: 0.27, p75: 0.34,  ours: 0.27,  ourLabel: "27%",   fmt: "pct",  hib: true,  pct: 50, kpiKey: "Win Rate (TTM)" },
+      salesCycleDays:    { label: "SALES CYCLE", p25: 102,  p50: 84,   p75: 64,    ours: 68,    ourLabel: "68d",   fmt: "days", hib: false, pct: 72, kpiKey: "Sales Cycle" },
+      asp:               { label: "ASP",         p25: 142,  p50: 178,  p75: 235,   ours: 198,   ourLabel: "$198K", fmt: "k",    hib: true,  pct: 58, kpiKey: "Avg Deal Size" },
+      coverageRatio:     { label: "COVERAGE",    p25: 2.4,  p50: 3.1,  p75: 4.0,   ours: 3.0,   ourLabel: "3.0x",  fmt: "x",    hib: true,  pct: 48, kpiKey: "Pipeline Coverage" },
+      forecastAccuracy:  { label: "FCST ACC",    p25: 0.12, p50: 0.08, p75: 0.05,  ours: 0.051, ourLabel: "±5.1%", fmt: "pct",  hib: false, pct: 74, kpiKey: null },
+      pipegenToQuota:    { label: "PIPEGEN",     p25: 0.18, p50: 0.24, p75: 0.32,  ours: 0.21,  ourLabel: "21%",   fmt: "pct",  hib: true,  pct: 34, kpiKey: null },
+      mktSourceShare:    { label: "MKT SOURCE",  p25: 0.25, p50: 0.32, p75: 0.41,  ours: 0.38,  ourLabel: "38%",   fmt: "pct",  hib: true,  pct: 65, kpiKey: null },
+      qualifiedNewLogos: { label: "NEW LOGOS",   p25: 4,    p50: 7,    p75: 12,    ours: 6,     ourLabel: "6",     fmt: "int",  hib: true,  pct: 40, kpiKey: null }
+    }
+  },
+
   /* Top deals — biggest open opportunities.
      motion = "new" (net-new logo) or "expansion" (upsell / renewal).
      Distribution: ~58% new / 42% expansion; every region and segment is
@@ -369,6 +395,7 @@ window.SALESPULSE_DATA = {
     { sym: "RISKREP",  val: "5/6",     chg: "▼ ON COACHING LIST" },
     { sym: "QUAL",     val: "4.8/8",   chg: "▼ 1 WEAK COMMIT" },
     { sym: "YOY",      val: "+17.8%",  chg: "PIPE vs Q2 FY25" },
+    { sym: "BENCH",    val: "P55",     chg: "INDEX 55 · PAVILION SaaS" },
     { sym: "INBOX",    val: "—",       chg: "ACTION QUEUE" },
     { sym: "REACH",    val: "0.67",    chg: "▼ 2 SINGLE-THREADED" },
     { sym: "USR",      val: "FULL",    chg: "LENS PERSONA" },
