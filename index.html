@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>SALESPULSE LIVE · TERMINAL</title>
   <meta name="description" content="SalesPulse Live — Bloomberg-style sales pipeline command center for VPs of Sales, RevOps, and AEs. Synthetic data only." />
-  <link rel="stylesheet" href="styles.css?v=0.7.0" />
+  <link rel="stylesheet" href="styles.css?v=0.8.0" />
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to main content</a>
@@ -323,6 +323,7 @@
       </div>
       <div class="panel-body">
         <ul class="rel-list">
+          <li><span class="ver">v0.8</span> <b>TOP-3 CONCENTRATION tile</b> appended to the KPI desk — "if top 3 deals slip, do we still hit number?" answered in one glance. Headline % of weighted pipe, $$ in 3 accounts, and a footer micro-stat showing whether commit still covers quota or by how much it would miss. Tone shifts at 25% (warn) and 40% (bad). Click the tile to scroll to TOP OPEN DEALS and pulse the 3 starred rows; same accounts also get a <i>★</i> badge in the table for instant visual link. AI insights bullet added. The tile honors the NEW vs EXPANSION lens so the top-3 always matches the currently visible deal slice · closes #11</li>
           <li><span class="ver">v0.7</span> <b>NEW vs EXPANSION motion lens</b> — global toggle pill in the hero strip (ALL · NEW LOGO · EXPANSION, persisted in localStorage) that re-slices KPI DESK, PIPELINE FUNNEL, FORECAST vs QUOTA, TOP OPEN DEALS (new <b>MOT</b> column), PIPELINE BY SEGMENT, and PIPELINE BY REGION to the selected motion. New motion-split stacked bar at the top of SEGMENTS shows the $$ + % + win-rate split at a glance even on ALL. Affected panels carry a motion chip in their subhead so the lens is always visible. `MOTION ALL/NEW/EXP` commands · closes #9</li>
           <li><span class="ver">v0.6</span> <b>WHAT CHANGED SINCE LAST FORECAST</b> panel directly below the hero strip — WoW commit movement, deal-probability moves (click to jump), rep-attainment moves, risks added/resolved. Every KPI tile now also carries a small <i>vs Jun 5</i> whisper line so the basis of every number is unambiguous (§9.7 trust). Updated AI Insights to reference the commit-recovery story · closes #10</li>
           <li><span class="ver">v0.5</span> <b>SLIPPAGE THIS QUARTER</b> panel — slipped deals, $$ out of period, FROM → TO dates, reasons, with concentration footer (top owner / region / reason). Click any row to jump to that account in TOP OPEN DEALS with a brief highlight. Removed the redundant single-line slippage entry from DEAL RISK & ANOMALY (the new panel owns the story) · closes #8</li>
@@ -345,7 +346,7 @@
     <span class="seg right"><span class="l">SYS</span> <span id="clock2">--:--:--</span></span>
   </div>
 
-  <script src="data.js?v=0.7.0"></script>
-  <script src="app.js?v=0.7.0"></script>
+  <script src="data.js?v=0.8.0"></script>
+  <script src="app.js?v=0.8.0"></script>
 </body>
 </html>

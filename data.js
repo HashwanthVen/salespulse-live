@@ -7,7 +7,14 @@ window.SALESPULSE_DATA = {
     quotaQ: 60.0,   // $60M quarterly quota
     quotaY: 230.0,
     weeksTotal: 13, // weeks in the quarter — used to compute the pace line
-    weekNow:    8   // current week index (matches trend.weeks.length)
+    weekNow:    8,  // current week index (matches trend.weeks.length)
+    // Numeric snapshot of the headline forecast numbers also rendered in
+    // the hero (commit $55.9M vs $60M quota, best case $69.8M, weighted
+    // pipeline $58.7M). Exposed numerically here so renderers (e.g.
+    // TOP-3 CONCENTRATION tile #11) don't have to parse "$X.XM" strings.
+    commitM:            55.9,
+    bestcaseM:          69.8,
+    weightedPipelineM:  58.7
   },
 
   /* Prior-week snapshot — powers WHAT CHANGED SINCE LAST FORECAST panel.
@@ -201,6 +208,7 @@ window.SALESPULSE_DATA = {
       "APAC has the highest growth rate (+16.5%) but lowest absolute pipeline — investment opportunity.",
       "Enterprise segment is 52% of pipeline but only 24% of deal count — deal quality is high.",
       "Expansion is 40% of pipeline but ~50% of weighted pipeline (40% win rate vs 22% for new logo) — under-invested high-ROI motion.",
+      "Top-3 accounts (Northwind, Contoso, Fabrikam) = ~30% of weighted pipe ($3.3M of $58.7M). If any slips, commit gap to quota widens by that amount — pressure-test these in pipe review.",
       "Activity score for E. Sokolova (55) is below threshold — coaching candidate.",
       "Recommended action: re-balance territory coverage in EMEA Mid-Market."
     ],

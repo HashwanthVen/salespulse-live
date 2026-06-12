@@ -281,12 +281,13 @@ main { padding: 10px 12px 50px; max-width: 1600px; margin: 0 auto; }
 /* KPI TILES */
 .kpi-grid {
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(7, 1fr);
   gap: 1px;
   background: var(--border);
   border: 1px solid var(--border);
 }
-@media (max-width: 1200px) { .kpi-grid { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 1400px) { .kpi-grid { grid-template-columns: repeat(4, 1fr); } }
+@media (max-width: 1000px) { .kpi-grid { grid-template-columns: repeat(3, 1fr); } }
 @media (max-width: 640px)  { .kpi-grid { grid-template-columns: repeat(2, 1fr); } }
 .kpi {
   background: var(--panel);
@@ -318,6 +319,27 @@ main { padding: 10px 12px 50px; max-width: 1600px; margin: 0 auto; }
   font-variant-numeric: tabular-nums;
 }
 .kpi .k-whisper b { color: var(--dim); font-weight: 700; }
+
+/* TOP-3 CONCENTRATION tile (#11) — clickable KPI variant with a
+   colored footer micro-stat showing the "if top 3 slip" gap to quota.
+   Footer color mirrors the tile-tone signal (green = still covered;
+   red = miss). Star badge inside TOP OPEN DEALS marks the same 3 rows
+   so the visual link from tile → table is one click and one glance. */
+.kpi-clickable { cursor: pointer; transition: background 80ms linear; }
+.kpi-clickable:hover { background: var(--bg-2); }
+.kpi-clickable:focus-visible { outline: 2px solid var(--green); outline-offset: -2px; }
+.kpi-foot {
+  margin-top: 6px; padding-top: 4px; border-top: 1px dashed var(--border);
+  font-size: 10px; font-weight: 700; letter-spacing: 0.5px;
+  font-variant-numeric: tabular-nums;
+}
+.kpi-foot.good { color: var(--green); }
+.kpi-foot.bad  { color: var(--red); }
+.kpi-foot.warn { color: var(--amber); }
+.deal-top3-star {
+  color: var(--amber); font-weight: 700; margin-right: 2px;
+  font-size: 12px; line-height: 1; vertical-align: -1px;
+}
 
 /* WHAT CHANGED SINCE LAST FORECAST — 4-card grid (stacks ≤720px).
    Card style is minimal (no rounded corners / shadows) to fit the

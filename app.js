@@ -78,7 +78,7 @@
     // prior snapshots aren't tracked, and showing the global prior under
     // motion-filtered current values would be misleading.
     const showWhisper = currentMotion === "all";
-    grid.innerHTML = list.map((k) => {
+    const baseTiles = list.map((k) => {
       const arrow = k.direction === "up" ? "▲" : k.direction === "down" ? "▼" : "▬";
       const pk    = KPI_PRIOR_KEY[k.label];
       const prior = pk ? priorK[pk] : null;
@@ -94,7 +94,101 @@
           ${whisper}
         </div>`;
     }).join("");
+    grid.innerHTML = baseTiles + renderConcentrationTile();
+    bindConcentration();
     setText("kpi-stamp", "LAST UPD " + new Date().toISOString().slice(11, 19) + "Z");
+  }
+
+  /* ---------- TOP-3 CONCENTRATION (#11) ----------
+     CRO/CFO "single point of failure" tile: top 3 deals (motion-filtered
+     if the lens is on) and what happens to the commit gap if they slip.
+     The tile is appended to #kpi-grid as a 7th tile. Clicking it scrolls
+     to TOP OPEN DEALS and pulses the 3 starred rows.
+
+     Tone bands (per acceptance):
+       share < 25%  → good
+       share 25-39% → warn
+       share ≥ 40%  → bad
+  */
+  function getTop3Deals() {
+    const pool = D.topDeals.filter((d) =>
+      currentMotion === "all" || d.motion === currentMotion
+    );
+    return pool.slice().sort((a, b) => b.amount - a.amount).slice(0, 3);
+  }
+  function concentrationStats() {
+    const top3 = getTop3Deals();
+    const unweighted = top3.reduce((a, d) => a + d.amount, 0) / 1e6;
+    const weighted   = top3.reduce((a, d) => a + d.amount * (d.prob / 100), 0) / 1e6;
+    const meta = D.meta || {};
+    // Use the motion's weighted pipeline when the lens is on, so the share
+    // calculation stays internally consistent ("X of Y" with both numbers
+    // in the same slice). Strip the leading "$" / trailing "M" from the
+    // KPI string as the fallback for older data shapes.
+    let weightedPipeM = meta.weightedPipelineM || 0;
+    if (currentMotion !== "all" && D.kpisByMotion && D.kpisByMotion[currentMotion]) {
+      const wp = D.kpisByMotion[currentMotion].find((k) => k.label === "Weighted Pipeline");
+      if (wp) weightedPipeM = parseFloat(String(wp.value).replace(/[^0-9.]/g, "")) || weightedPipeM;
+    }
+    const share = weightedPipeM > 0 ? (weighted / weightedPipeM) * 100 : 0;
+    const commitM = meta.commitM || 0;
+    const quotaM  = meta.quotaQ  || 0;
+    // "If top 3 slip": commit minus their weighted contribution, vs quota.
+    // Positive = still covered, negative = miss by that amount.
+    const gap = (commitM - weighted) - quotaM;
+    let tone = "good";
+    if (share >= 40)      tone = "bad";
+    else if (share >= 25) tone = "warn";
+    return { top3, unweighted, weighted, share, gap, tone };
+  }
+  function renderConcentrationTile() {
+    const s = concentrationStats();
+    if (!s.top3.length) return "";
+    const sharePct = s.share.toFixed(0);
+    const weightedFmt = s.weighted.toFixed(1);
+    const gapAbs = Math.abs(s.gap).toFixed(1);
+    const gapArrow = s.gap >= 0 ? "▲" : "▼";
+    const gapWord  = s.gap >= 0 ? "STILL COVERED BY" : "MISS BY";
+    const gapCls   = s.gap >= 0 ? "good" : "bad";
+    const tooltip = "If top 3 slip: " + s.top3.map((d) =>
+      `${d.account} ($${(d.amount/1e6).toFixed(2)}M × ${d.prob}% = $${((d.amount*d.prob/100)/1e6).toFixed(2)}M weighted)`
+    ).join(" · ");
+    return `
+      <div class="kpi ${s.tone} kpi-clickable" id="kpi-conc" role="button" tabindex="0"
+           data-accounts="${esc(s.top3.map((d) => d.account).join("|"))}"
+           title="${esc(tooltip)}"
+           aria-label="Top 3 concentration: ${sharePct}% of weighted pipeline. Click to highlight top 3 in deals table.">
+        <div class="k-label"><span>TOP-3 CONCENTRATION</span><span class="badge">LIVE</span></div>
+        <div class="k-value">${sharePct}%</div>
+        <div class="k-delta flat">OF WEIGHTED</div>
+        <div class="k-note">$${weightedFmt}M IN 3 ACCOUNTS</div>
+        <div class="kpi-foot ${gapCls}">IF SLIPPED: ${gapArrow} $${gapAbs}M ${gapWord} QUOTA</div>
+      </div>`;
+  }
+  function bindConcentration() {
+    const tile = $("kpi-conc");
+    if (!tile) return;
+    const go = () => {
+      const accounts = (tile.dataset.accounts || "").split("|").filter(Boolean);
+      // Clear filters so the top 3 are definitely visible, then pulse each.
+      const search = $("deal-search");   if (search) search.value = "";
+      const region = $("deal-region");   if (region) region.value = "all";
+      const fcst   = $("deal-forecast"); if (fcst)   fcst.value   = "all";
+      if (myDealsActive) { myDealsActive = false; updateMyDealsBtn(); }
+      applyDealFilters();
+      document.getElementById("deals").scrollIntoView({ behavior: "smooth", block: "start" });
+      // Slight delay so the smooth-scroll lands before the pulse starts.
+      setTimeout(() => accounts.forEach(highlightDealRow), 200);
+    };
+    tile.addEventListener("click", go);
+    tile.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); }
+    });
+  }
+  function topAccountSet() {
+    const set = new Set();
+    getTop3Deals().forEach((d) => set.add(d.account));
+    return set;
   }
 
   /* ---------- WHAT CHANGED SINCE LAST FORECAST ---------- */
@@ -419,15 +513,21 @@
     }
     const total = rows.reduce((a, r) => a + r.amount, 0);
     setText("deals-count", `${rows.length} OPEN · $${(total/1e6).toFixed(1)}M`);
+    // Pre-compute the top-3 set so each row knows whether to render the
+    // TOP-3 CONCENTRATION (#11) star badge in the ACCOUNT column.
+    const top3 = topAccountSet();
     tbody.innerHTML = rows.map((d) => {
       const probCls = d.prob >= 70 ? "green" : d.prob >= 40 ? "amber" : "red";
       const fcst = (d.forecast || "upside").toLowerCase();
       const mot  = d.motion || "new";
       const motCls = mot === "expansion" ? "exp" : "new";
       const motLbl = mot === "expansion" ? "EXP" : "NEW";
+      const star = top3.has(d.account)
+        ? `<span class="deal-top3-star" title="Top-3 account — single-point-of-failure deal">★</span> `
+        : "";
       return `
         <tr data-account="${esc(d.account)}">
-          <td><b class="green">${esc(d.account)}</b></td>
+          <td>${star}<b class="green">${esc(d.account)}</b></td>
           <td>${esc(d.stage)}</td>
           <td class="num">$${formatK(d.amount)}</td>
           <td class="num ${probCls}">${d.prob}%</td>
