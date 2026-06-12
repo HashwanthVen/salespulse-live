@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>SALESPULSE LIVE · FEEDBACK</title>
+  <meta name="description" content="Submit feedback on the SalesPulse Live dashboard." />
+  <link rel="stylesheet" href="styles.css?v=0.1.0" />
+</head>
+<body>
+  <div class="ticker" aria-label="Ticker tape">
+    <div class="ticker-track" id="ticker-track"></div>
+  </div>
+
+  <div class="req-wrap">
+    <a class="nav-back" href="index.html">◂ BACK TO TERMINAL</a>
+
+    <section class="req-hero">
+      <h2>FEEDBACK</h2>
+      <p>What's missing? What's broken? What would make this dashboard better for a VP of Sales / RevOps / AE?</p>
+    </section>
+
+    <section class="req-card">
+      <form id="req-form" novalidate>
+        <div class="field">
+          <label for="f-title">What should we change or add?</label>
+          <input id="f-title" type="text" required maxlength="120"
+                 placeholder="e.g. Add a win/loss reason breakdown"
+                 autocomplete="off" autocapitalize="sentences" />
+        </div>
+
+        <div class="field">
+          <label for="f-desc">Tell us more (optional)</label>
+          <textarea id="f-desc" maxlength="600"
+                    placeholder="Who is this for (VP Sales / RevOps / AE / Sales Manager)? Why does it matter? Any specifics?"></textarea>
+        </div>
+
+        <div class="field">
+          <label for="f-type">Type</label>
+          <select id="f-type">
+            <option value="Feature">Feature</option>
+            <option value="Bug">Bug</option>
+            <option value="UI polish">UI polish</option>
+            <option value="Insight">Insight</option>
+          </select>
+        </div>
+
+        <button type="submit" class="submit-btn" id="btn-submit">▶ SUBMIT</button>
+        <div class="submit-result" id="result" role="status" aria-live="polite"></div>
+      </form>
+    </section>
+
+    <section class="live-feed" aria-labelledby="feed-title">
+      <h3 id="feed-title">LIVE AUDIENCE FEEDBACK</h3>
+      <div id="feed"><div class="feed-empty">Loading…</div></div>
+    </section>
+  </div>
+
+  <script src="data.js?v=0.1.0"></script>
+  <script src="requests.js?v=0.1.0"></script>
+</body>
+</html>

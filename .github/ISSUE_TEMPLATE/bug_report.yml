@@ -1,0 +1,58 @@
+name: Bug report
+description: Report a bug in the dashboard
+title: "[Bug] "
+labels: ["bug", "demo-request"]
+body:
+  - type: input
+    id: summary
+    attributes:
+      label: Summary
+      placeholder: e.g. Funnel bar overflows at 360px width
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - KPI desk
+        - Pipeline funnel
+        - Forecast vs quota chart
+        - Top deals table
+        - Rep leaderboard
+        - Segments / regions
+        - Risk panel
+        - AI insights
+        - Audience feedback panel
+        - Mobile / responsive
+        - Other
+    validations:
+      required: true
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      options:
+        - Low
+        - Medium
+        - High
+    validations:
+      required: true

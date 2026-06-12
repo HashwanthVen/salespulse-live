@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SALESPULSE LIVE · TERMINAL</title>
+  <meta name="description" content="SalesPulse Live — Bloomberg-style sales pipeline command center for VPs of Sales, RevOps, and AEs. Synthetic data only." />
+  <link rel="stylesheet" href="styles.css?v=0.1.0" />
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to main content</a>
+
+  <!-- TICKER -->
+  <div class="ticker" aria-label="Ticker tape">
+    <div class="ticker-track" id="ticker-track"></div>
+  </div>
+
+  <!-- TOP BAR -->
+  <div class="terminal-bar" role="banner">
+    <div class="brand">
+      <span class="dot" aria-hidden="true"></span>
+      <span>SALESPULSE&nbsp;LIVE</span>
+      <span class="sub">B2B SAAS PIPELINE COMMAND CENTER · Q2 FY26</span>
+    </div>
+    <div class="clock"><span class="lbl">SYS</span><span id="clock">--:--:--</span></div>
+  </div>
+
+  <!-- FUNCTION KEYS -->
+  <nav class="fkeys" aria-label="Function keys">
+    <a class="fkey active" href="#dashboard"><span class="k">F1</span> DASH</a>
+    <a class="fkey" href="#kpis"><span class="k">F2</span> KPIS</a>
+    <a class="fkey" href="#funnel"><span class="k">F3</span> FUNNEL</a>
+    <a class="fkey" href="#forecast"><span class="k">F4</span> FCST</a>
+    <a class="fkey" href="#deals"><span class="k">F5</span> DEALS</a>
+    <a class="fkey" href="#reps"><span class="k">F6</span> REPS</a>
+    <a class="fkey" href="#segments"><span class="k">F7</span> SEG</a>
+    <a class="fkey" href="#risks"><span class="k">F8</span> RISK</a>
+    <a class="fkey" href="#audience"><span class="k">F9</span> AUD</a>
+    <a class="fkey primary" href="requests.html"><span class="k">+</span> FEEDBACK</a>
+  </nav>
+
+  <!-- COMMAND BAR -->
+  <div class="cmd-bar">
+    <span class="prompt">SLS&gt;</span>
+    <input id="cmd" type="text" placeholder="enter command (HELP / GO DEALS / GO REPS / FILTER NA / SORT AMOUNT)" aria-label="Command input" />
+    <span class="cursor" aria-hidden="true"></span>
+    <span class="hint">Type HELP and press Enter</span>
+  </div>
+
+  <main id="main">
+
+    <!-- HERO STRIP -->
+    <section class="hero" aria-labelledby="hero-title">
+      <span class="label">Q2 FY26 · WEEK 8 OF 13</span>
+      <div class="summary" id="hero-title">
+        Commit at <span class="green">$55.9M</span> vs <span class="amber">$60M quota</span> · best case <span class="green">$69.8M</span> · need <span class="amber">$4.1M</span> to close gap.
+      </div>
+      <div class="chips">
+        <span class="chip good">▲ COVERAGE 3.1x</span>
+        <span class="chip warn">● COMMIT GAP</span>
+        <span class="chip info">↗ WIN RATE +1.6pts</span>
+      </div>
+    </section>
+
+    <!-- KPI DESK -->
+    <section id="dashboard" class="panel" aria-labelledby="kpi-title">
+      <div class="panel-head">
+        <span class="title" id="kpi-title">KPI DESK</span>
+        <span class="sub">SNAPSHOT · 6 METRICS</span>
+        <span class="right muted" id="kpi-stamp"></span>
+      </div>
+      <div id="kpi-grid" class="kpi-grid" aria-live="polite"></div>
+    </section>
+
+    <!-- FUNNEL + FORECAST -->
+    <div class="row-grid cols-2">
+      <section id="funnel" class="panel" aria-labelledby="funnel-title">
+        <div class="panel-head">
+          <span class="title" id="funnel-title">PIPELINE FUNNEL</span>
+          <span class="sub">$M · STAGE → STAGE CONVERSION</span>
+        </div>
+        <div class="panel-body tight">
+          <div class="funnel" id="funnel"></div>
+        </div>
+      </section>
+
+      <section id="forecast" class="panel" aria-labelledby="forecast-title">
+        <div class="panel-head">
+          <span class="title" id="forecast-title">FORECAST vs QUOTA</span>
+          <span class="sub">CUMULATIVE · WEEKLY</span>
+          <div class="right">
+            <div class="toggle-group" role="tablist">
+              <button class="toggle active" role="tab" data-series="commit">COMMIT</button>
+              <button class="toggle" role="tab" data-series="bestcase">BEST CASE</button>
+            </div>
+          </div>
+        </div>
+        <div class="panel-body tight">
+          <div class="chart-wrap">
+            <div class="chart-stat" id="chart-stat"></div>
+            <svg class="chart-svg" id="chart-svg" viewBox="0 0 600 240" preserveAspectRatio="none" role="img" aria-label="Forecast vs quota chart"></svg>
+          </div>
+          <div class="chart-legend">
+            <span><span class="swatch" style="background:var(--green)"></span>Selected series</span>
+            <span><span class="swatch" style="background:var(--amber);height:2px;margin-bottom:3px;"></span>Quota line</span>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- TOP DEALS -->
+    <section id="deals" class="panel" aria-labelledby="deals-title">
+      <div class="panel-head">
+        <span class="title" id="deals-title">TOP OPEN DEALS</span>
+        <span class="sub" id="deals-count"></span>
+        <div class="right controls">
+          <input id="deal-search" class="input" type="search" placeholder="SEARCH ACCOUNT" aria-label="Search account" />
+          <select id="deal-region" class="input" aria-label="Filter region">
+            <option value="all">ALL REGIONS</option>
+            <option>NA</option><option>EMEA</option><option>APAC</option>
+          </select>
+          <select id="deal-forecast" class="input" aria-label="Filter forecast">
+            <option value="all">ALL FORECAST</option>
+            <option value="commit">COMMIT</option>
+            <option value="bestcase">BEST CASE</option>
+            <option value="upside">UPSIDE</option>
+          </select>
+        </div>
+      </div>
+      <div class="panel-body tight" style="overflow-x:auto;">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>ACCOUNT</th>
+              <th>STAGE</th>
+              <th class="num">AMOUNT</th>
+              <th class="num">PROB</th>
+              <th>CLOSE</th>
+              <th>OWNER</th>
+              <th>REGION</th>
+              <th>SEG</th>
+              <th>FCST</th>
+            </tr>
+          </thead>
+          <tbody id="deals-tbody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- REPS + SEGMENTS row -->
+    <div class="row-grid cols-2">
+      <section id="reps" class="panel" aria-labelledby="reps-title">
+        <div class="panel-head">
+          <span class="title" id="reps-title">REP LEADERBOARD</span>
+          <span class="sub">QUOTA ATTAINMENT · Q2</span>
+        </div>
+        <div class="panel-body tight" style="overflow-x:auto;">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>REP</th>
+                <th>RGN</th>
+                <th class="num">QUOTA</th>
+                <th>ATTAIN</th>
+                <th class="num">PIPE</th>
+                <th class="num">WON</th>
+                <th class="num">ACTIVITY</th>
+              </tr>
+            </thead>
+            <tbody id="reps-tbody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="segments" class="panel" aria-labelledby="seg-title">
+        <div class="panel-head">
+          <span class="title" id="seg-title">PIPELINE BY SEGMENT</span>
+          <span class="sub">$M · % SHARE</span>
+        </div>
+        <div class="panel-body tight">
+          <div class="seg-grid" id="seg-grid"></div>
+        </div>
+        <div class="panel-head" style="border-top:1px solid var(--border);">
+          <span class="title">PIPELINE BY REGION</span>
+        </div>
+        <div class="panel-body tight" style="overflow-x:auto;">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>REGION</th>
+                <th class="num">PIPE</th>
+                <th class="num">DEALS</th>
+                <th class="num">GROWTH</th>
+                <th>STATUS</th>
+              </tr>
+            </thead>
+            <tbody id="region-tbody"></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
+    <!-- RISKS + INSIGHTS -->
+    <div class="row-grid cols-2">
+      <section id="risks" class="panel" aria-labelledby="risk-title">
+        <div class="panel-head">
+          <span class="title" id="risk-title">DEAL RISK & ANOMALY</span>
+          <span class="sub" id="risk-count"></span>
+        </div>
+        <div class="panel-body">
+          <ul class="risk-list" id="risk-list"></ul>
+        </div>
+      </section>
+
+      <section id="insights" class="panel" aria-labelledby="ins-title">
+        <div class="panel-head">
+          <span class="title" id="ins-title">AI INSIGHTS</span>
+          <span class="sub">SYNTHESIZED · ROTATING</span>
+          <div class="right">
+            <button class="btn sm" id="regen-insight">↻ ROTATE</button>
+          </div>
+        </div>
+        <div class="panel-body">
+          <ul class="insight-list" id="insight-list"></ul>
+        </div>
+      </section>
+    </div>
+
+    <!-- LIVE AUDIENCE FEEDBACK -->
+    <section id="audience" class="panel" aria-labelledby="aud-title">
+      <div class="panel-head">
+        <span class="title" id="aud-title">LIVE AUDIENCE FEEDBACK</span>
+        <span class="sub">GITHUB ISSUES · AUTO-REFRESH 30s</span>
+        <div class="right">
+          <span class="muted" id="aud-stamp" style="font-size:10px;"></span>
+          <a class="btn sm" href="requests.html">+ NEW</a>
+          <button class="btn sm" id="aud-refresh">↻ REFRESH</button>
+        </div>
+      </div>
+      <div class="panel-body tight">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>WHEN</th>
+              <th>TYPE</th>
+              <th>TITLE</th>
+              <th>WHO</th>
+              <th>STATUS</th>
+            </tr>
+          </thead>
+          <tbody id="aud-tbody"><tr><td colspan="5" style="text-align:center;color:var(--dim);padding:18px;">LOADING…</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- RELEASE NOTES -->
+    <section id="release" class="panel" aria-labelledby="rel-title">
+      <div class="panel-head">
+        <span class="title" id="rel-title">RELEASE NOTES</span>
+        <span class="sub">UPDATED BY THE BUILDER AGENT</span>
+      </div>
+      <div class="panel-body">
+        <ul class="rel-list">
+          <li><span class="ver">v0.1</span> Baseline SalesPulse Live dashboard · 6 KPIs · funnel · forecast vs quota · top deals · rep leaderboard · segments + regions · risks · live audience feedback</li>
+        </ul>
+      </div>
+    </section>
+  </main>
+
+  <!-- STATUS BAR -->
+  <div class="status-bar">
+    <span class="seg"><span class="l">ENV</span> DEMO</span>
+    <span class="seg"><span class="l">USR</span> VP SALES</span>
+    <span class="seg"><span class="l">PER</span> Q2 FY26</span>
+    <span class="seg"><span class="l">CCY</span> USD</span>
+    <span class="seg"><span class="l">DATA</span> SYNTHETIC</span>
+    <span class="seg right"><span class="l">SYS</span> <span id="clock2">--:--:--</span></span>
+  </div>
+
+  <script src="data.js?v=0.1.0"></script>
+  <script src="app.js?v=0.1.0"></script>
+</body>
+</html>
