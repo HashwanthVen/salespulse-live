@@ -594,6 +594,120 @@
     updateMyDealsBtn();
   }
 
+  /* ---------- PIPELINE CREATED / Pipegen (#12) ----------
+     Leading indicator panel: 8 paired vertical bars per week (NEW IN
+     in green, OUT in amber), dashed horizontal target line, red flag
+     tick above any week where NEW IN < target. Header stat row shows
+     this-week NET, trailing-8w avg NET, and the target. Source-mix
+     stacked horizontal bar shows where the trailing pipegen came from
+     (outbound / inbound / partner / expansion). Pure SVG, no library. */
+  function renderPipegen() {
+    const p = D.pipegen;
+    if (!p || !Array.isArray(p.newIn) || !Array.isArray(p.out)) return;
+    const svg     = $("pipe-svg");
+    const statEl  = $("pipe-stat");
+    const mixEl   = $("pipe-mix");
+    const capEl   = $("pipe-caption");
+    if (!svg) return;
+
+    const weeks   = p.weeks || [];
+    const target  = p.weeklyTarget || 0;
+    const n       = p.newIn.length;
+    const net     = p.newIn.map((v, i) => +(v - p.out[i]).toFixed(2));
+    const lastIn  = p.newIn[n - 1] || 0;
+    const lastNet = net[n - 1] || 0;
+    const ttwAvgNet = +(net.reduce((a, b) => a + b, 0) / Math.max(net.length, 1)).toFixed(1);
+    const lastNetCls = lastNet >= 0 ? "green" : "red";
+    const lastNetArr = lastNet >= 0 ? "▲" : "▼";
+    const ttwCls     = ttwAvgNet >= target * 0.5 ? "green" : ttwAvgNet >= 0 ? "amber" : "red";
+    const lastVsTarget = lastIn - target;
+    const lastVsTargetCls = lastVsTarget >= 0 ? "green" : "red";
+
+    if (statEl) {
+      statEl.innerHTML = `
+        <div><span>THIS WK NET</span><b class="${lastNetCls}">${lastNetArr} $${Math.abs(lastNet).toFixed(1)}M</b></div>
+        <div><span>THIS WK NEW IN</span><b>$${lastIn.toFixed(1)}M</b> <span class="muted">(vs target ${lastVsTarget >= 0 ? "+" : ""}<span class="${lastVsTargetCls}">$${Math.abs(lastVsTarget).toFixed(1)}M</span>)</span></div>
+        <div><span>TTW AVG NET</span><b class="${ttwCls}">$${ttwAvgNet.toFixed(1)}M</b></div>
+        <div><span>TARGET</span><b>$${target.toFixed(1)}M/wk</b></div>
+        <div><span>WEEKS &lt; TARGET</span><b>${p.newIn.filter((v) => v < target).length} of ${n}</b></div>
+      `;
+    }
+
+    // SVG layout
+    const W = 600, H = 200;
+    const PADL = 36, PADR = 14, PADT = 22, PADB = 26;
+    const innerW = W - PADL - PADR;
+    const innerH = H - PADT - PADB;
+    const maxV = Math.max(target, ...p.newIn, ...p.out);
+    const yMax = maxV * 1.15;
+    const toY  = (v) => PADT + innerH - (v / yMax) * innerH;
+    const slot = innerW / n;
+    const barW = Math.max(6, slot * 0.32);
+    const gap  = Math.max(2, slot * 0.06);
+
+    const grid = [];
+    for (let i = 0; i <= 4; i++) {
+      const y = PADT + (i / 4) * innerH;
+      const v = yMax - (i / 4) * yMax;
+      grid.push(`<line x1="${PADL}" y1="${y}" x2="${W - PADR}" y2="${y}"/>`);
+      grid.push(`<text x="${PADL - 4}" y="${y + 3}" text-anchor="end">${v.toFixed(0)}</text>`);
+    }
+
+    const bars = [];
+    const ticks = [];
+    const labels = [];
+    for (let i = 0; i < n; i++) {
+      const cx = PADL + slot * i + slot / 2;
+      const xIn  = cx - barW - gap / 2;
+      const xOut = cx + gap / 2;
+      const yIn  = toY(p.newIn[i]);
+      const yOut = toY(p.out[i]);
+      const baseY = toY(0);
+      bars.push(`<rect class="pipe-bar-in"  x="${xIn.toFixed(1)}"  y="${yIn.toFixed(1)}"  width="${barW.toFixed(1)}" height="${(baseY - yIn).toFixed(1)}"><title>${esc(weeks[i] || ("W"+(i+1)))} NEW IN: $${p.newIn[i].toFixed(1)}M</title></rect>`);
+      bars.push(`<rect class="pipe-bar-out" x="${xOut.toFixed(1)}" y="${yOut.toFixed(1)}" width="${barW.toFixed(1)}" height="${(baseY - yOut).toFixed(1)}"><title>${esc(weeks[i] || ("W"+(i+1)))} OUT: $${p.out[i].toFixed(1)}M</title></rect>`);
+      labels.push(`<text x="${cx.toFixed(1)}" y="${H - 8}" text-anchor="middle">${esc(weeks[i] || ("W"+(i+1)))}</text>`);
+      // Red flag dot above the NEW IN bar when it missed target.
+      if (p.newIn[i] < target) {
+        ticks.push(`<circle class="pipe-miss-dot" cx="${cx.toFixed(1)}" cy="${(yIn - 8).toFixed(1)}" r="3.5"><title>${esc(weeks[i] || ("W"+(i+1)))}: $${p.newIn[i].toFixed(1)}M below $${target.toFixed(1)}M target</title></circle>`);
+      }
+    }
+    // Dashed target line + label.
+    const yT = toY(target);
+    const targetLine = `<line class="pipe-target" x1="${PADL}" y1="${yT.toFixed(1)}" x2="${W - PADR}" y2="${yT.toFixed(1)}"/>`;
+    const targetLabel = `<text class="pipe-target-lbl" x="${(W - PADR - 4).toFixed(1)}" y="${(yT - 4).toFixed(1)}" text-anchor="end">TARGET $${target.toFixed(1)}M</text>`;
+
+    svg.innerHTML = `
+      <g class="chart-grid">${grid.join("")}</g>
+      <g class="chart-axis">${labels.join("")}</g>
+      <g>${bars.join("")}</g>
+      ${targetLine}
+      ${targetLabel}
+      <g>${ticks.join("")}</g>
+    `;
+
+    // Source mix stacked horizontal bar.
+    if (mixEl) {
+      const m = p.sourceMix || {};
+      const segs = [
+        { k: "outbound",  lbl: "OUTBOUND",  cls: "pipe-mix-out", v: m.outbound  || 0 },
+        { k: "inbound",   lbl: "INBOUND",   cls: "pipe-mix-in",  v: m.inbound   || 0 },
+        { k: "partner",   lbl: "PARTNER",   cls: "pipe-mix-pa",  v: m.partner   || 0 },
+        { k: "expansion", lbl: "EXP",       cls: "pipe-mix-ex",  v: m.expansion || 0 }
+      ];
+      const total = segs.reduce((a, s) => a + s.v, 0) || 100;
+      mixEl.innerHTML = `
+        <div class="pipe-mix-bar" role="img" aria-label="${segs.map((s) => s.lbl + " " + s.v + "%").join(", ")}">
+          ${segs.map((s) => `<span class="${s.cls}" style="width:${(s.v / total * 100).toFixed(2)}%;" title="${s.lbl} · ${s.v}%">${s.v >= 10 ? s.lbl + " " + s.v + "%" : ""}</span>`).join("")}
+        </div>
+        <div class="pipe-mix-legend">
+          ${segs.map((s) => `<span><i class="pipe-mix-dot ${s.cls}"></i>${s.lbl} <b>${s.v}%</b></span>`).join("")}
+        </div>`;
+    }
+    if (capEl) {
+      capEl.textContent = "Weekly target = quota ($60M) × 3x coverage ÷ 13 weeks ≈ $13.85M (rounded to $13.5M). Red dots flag weeks where NEW IN missed the target.";
+    }
+  }
+
   /* ---------- SLIPPAGE THIS QUARTER ---------- */
   // Computes the panel from D.slippage: header stat (deal count, $$ out,
   // QoQ delta), the per-deal table with severity-tinted amounts, and a
@@ -958,7 +1072,7 @@
   }
   function runCommand(cmd) {
     if (cmd === "HELP") {
-      flash("CMDS: GO DASH | GO CHG | GO FUNNEL | GO FORECAST | GO DEALS | GO REPS | GO SLIP | GO RISKS | GO AUD | FILTER NA/EMEA/APAC | FCST COMMIT/BEST | MOTION ALL/NEW/EXP | ROTATE");
+      flash("CMDS: GO DASH | GO CHG | GO FUNNEL | GO FORECAST | GO DEALS | GO REPS | GO SLIP | GO PIPE | GO RISKS | GO AUD | FILTER NA/EMEA/APAC | FCST COMMIT/BEST | MOTION ALL/NEW/EXP | ROTATE");
       return;
     }
     const goMap = {
@@ -967,6 +1081,7 @@
       "GO REPS": "reps", "GO SEG": "segments", "GO SEGMENTS": "segments",
       "GO RISKS": "risks", "GO SLIP": "slippage", "GO SLIPPAGE": "slippage",
       "GO CHG": "changed", "GO CHANGED": "changed",
+      "GO PIPE": "pipegen", "GO PIPEGEN": "pipegen",
       "GO AUD": "audience", "GO AUDIENCE": "audience",
       "GO NOTES": "release"
     };
@@ -1029,6 +1144,7 @@
     renderRegions();
     renderRisks();
     renderSlippage();
+    renderPipegen();
     renderInsight();
     bindRegen();
     bindCommand();

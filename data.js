@@ -209,6 +209,7 @@ window.SALESPULSE_DATA = {
       "Enterprise segment is 52% of pipeline but only 24% of deal count — deal quality is high.",
       "Expansion is 40% of pipeline but ~50% of weighted pipeline (40% win rate vs 22% for new logo) — under-invested high-ROI motion.",
       "Top-3 accounts (Northwind, Contoso, Fabrikam) = ~30% of weighted pipe ($3.3M of $58.7M). If any slips, commit gap to quota widens by that amount — pressure-test these in pipe review.",
+      "Pipegen ran below the $13.5M/wk target in 3 of 8 weeks (W1, W3, W7) — outbound is 42% of mix but the misses lined up with inbound-light weeks. Action: review SDR ramp + inbound campaign cadence.",
       "Activity score for E. Sokolova (55) is below threshold — coaching candidate.",
       "Recommended action: re-balance territory coverage in EMEA Mid-Market."
     ],
@@ -220,6 +221,26 @@ window.SALESPULSE_DATA = {
     ]
   ],
 
+  /* PIPELINE CREATED / Pipegen (#12) — weekly NEW IN / OUT / NET pipeline,
+     vs the weekly target derived from quota × 3x coverage / 13 weeks.
+     Story (intentional): NET is positive every week (NEW IN > OUT) but
+     3 of 8 weeks were below the $13.5M target — a realistic "trending
+     well but not great" pipegen narrative for the AI insight bullet.
+     Marketing-source mix shows outbound dominant; inbound-light weeks
+     map to the target misses. */
+  pipegen: {
+    weeks:        ["W1","W2","W3","W4","W5","W6","W7","W8"],
+    newIn:        [12.2, 14.8, 11.6, 16.4, 13.9, 15.2, 12.8, 17.1],
+    out:          [ 6.4,  7.1,  5.8,  8.2,  6.9,  7.6,  6.4,  8.5],
+    weeklyTarget: 13.5,
+    sourceMix: {
+      outbound:  42,
+      inbound:   31,
+      partner:   18,
+      expansion:  9
+    }
+  },
+
   /* Synthetic ticker symbols — deals, reps, segments */
   ticker: [
     { sym: "PIPE",     val: "184.2M",  chg: "+12.4%" },
@@ -230,6 +251,7 @@ window.SALESPULSE_DATA = {
     { sym: "COV",      val: "3.1x",    chg: "+0.1" },
     { sym: "Q2COMMIT", val: "55.9M",   chg: "-4.1M" },
     { sym: "Q2BEST",   val: "69.8M",   chg: "+9.8M" },
+    { sym: "PIPEGEN",  val: "17.1M",   chg: "+8.6M NET" },
     { sym: "RIVERA",   val: "102%",    chg: "+2%" },
     { sym: "PATEL",    val: "88%",     chg: "+5%" },
     { sym: "CHEN",     val: "76%",     chg: "+3%" },

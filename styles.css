@@ -417,6 +417,8 @@ main { padding: 10px 12px 50px; max-width: 1600px; margin: 0 auto; }
 .chart-legend .swatch { display: inline-block; width: 10px; height: 10px; vertical-align: middle; margin-right: 5px; }
 .chart-legend .swatch-band { background: var(--green-soft); opacity: 0.6; border: 1px solid var(--green-dim); }
 .chart-legend .swatch-pace { background: var(--dim); height: 2px; margin-bottom: 3px; }
+.chart-legend .swatch-pipe-target { background: var(--amber); height: 2px; margin-bottom: 3px; opacity: 0.9; }
+.chart-legend .swatch-pipe-miss   { background: var(--red); border-radius: 50%; width: 8px; height: 8px; }
 .chart-caption { padding: 0 14px 12px; font-size: 11px; color: var(--dim); min-height: 14px; }
 
 /* TOGGLES */
@@ -754,4 +756,82 @@ select option { background: var(--bg); color: var(--white); }
   .motion-split .ms-bar { height: 20px; }
   .motion-split .ms-bar span { font-size: 9px; }
   .motion-split .ms-legend { gap: 8px; font-size: 10px; }
+}
+
+/* PIPELINE CREATED (#12) — leading-indicator panel.
+   Stat row mirrors .slip-stat / .chart-stat pattern; bars are pure SVG
+   so no new assets are introduced. Target line and miss-dot use the
+   same amber/red semantic colors as the rest of the dashboard. */
+.pipe-stat {
+  display: flex; gap: 14px; align-items: center; flex-wrap: wrap;
+  padding: 10px 14px;
+  border-bottom: 1px dashed var(--border);
+  font-size: 12px; color: var(--white); letter-spacing: 0.5px;
+}
+.pipe-stat > div { display: flex; flex-direction: column; min-width: 96px; }
+.pipe-stat span { color: var(--dim); font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; }
+.pipe-stat b { font-weight: 700; font-size: 14px; font-variant-numeric: tabular-nums; }
+.pipe-stat .muted { color: var(--dim); font-size: 11px; font-weight: 400; text-transform: none; letter-spacing: 0; margin-top: 2px; }
+.pipe-stat .green { color: var(--green); }
+.pipe-stat .amber { color: var(--amber); }
+.pipe-stat .red   { color: var(--red); }
+
+.pipe-chart-wrap { padding: 8px 14px 4px; height: 200px; }
+.pipe-svg { width: 100%; height: 100%; display: block; }
+.pipe-svg .chart-grid line { stroke: var(--border); stroke-width: 1; }
+.pipe-svg .chart-grid text { fill: var(--dim); font-size: 9px; font-family: var(--mono); }
+.pipe-svg .chart-axis text { fill: var(--dim); font-size: 10px; font-family: var(--mono); letter-spacing: 1px; }
+.pipe-svg .pipe-bar-in  { fill: var(--green); }
+.pipe-svg .pipe-bar-out { fill: var(--amber); opacity: 0.85; }
+.pipe-svg .pipe-target  { stroke: var(--amber); stroke-width: 1.5; stroke-dasharray: 4 4; opacity: 0.9; }
+.pipe-svg .pipe-target-lbl { fill: var(--amber); font-size: 9px; font-family: var(--mono); letter-spacing: 1px; }
+.pipe-svg .pipe-miss-dot { fill: var(--red); stroke: var(--bg); stroke-width: 1; }
+
+.pipe-legend {
+  display: flex; gap: 14px; padding: 4px 14px 8px; font-size: 11px; color: var(--dim); flex-wrap: wrap;
+}
+.pipe-legend .swatch { display: inline-block; width: 10px; height: 10px; vertical-align: middle; margin-right: 5px; }
+
+.pipe-mix-head {
+  display: flex; justify-content: space-between; align-items: baseline;
+  padding: 8px 14px 4px; font-size: 11px; letter-spacing: 1px;
+  color: var(--green); font-weight: 700; border-top: 1px dashed var(--border);
+}
+.pipe-mix-head .muted { color: var(--dim); font-weight: 400; letter-spacing: 0; }
+
+.pipe-mix { padding: 0 14px 6px; }
+.pipe-mix-bar {
+  display: flex; width: 100%; height: 22px;
+  border: 1px solid var(--border-2); background: var(--bg-1);
+}
+.pipe-mix-bar span {
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 700; letter-spacing: 1px; color: #000;
+  white-space: nowrap; overflow: hidden;
+}
+.pipe-mix-bar .pipe-mix-out { background: var(--green); }
+.pipe-mix-bar .pipe-mix-in  { background: var(--cyan); }
+.pipe-mix-bar .pipe-mix-pa  { background: var(--amber); }
+.pipe-mix-bar .pipe-mix-ex  { background: var(--magenta); color: var(--white); }
+
+.pipe-mix-legend {
+  display: flex; gap: 14px; margin-top: 6px; font-size: 11px; color: var(--dim); flex-wrap: wrap;
+}
+.pipe-mix-legend b { color: var(--white); }
+.pipe-mix-legend .pipe-mix-dot {
+  display: inline-block; width: 9px; height: 9px; margin-right: 5px;
+  vertical-align: middle; border: 1px solid var(--border-2);
+}
+
+.pipe-caption { padding: 4px 14px 12px; font-size: 11px; color: var(--dim); min-height: 14px; }
+
+@media (max-width: 720px) {
+  .pipe-stat { font-size: 11px; gap: 8px 10px; padding: 8px 10px; }
+  .pipe-stat > div { min-width: 80px; }
+  .pipe-stat b { font-size: 13px; }
+  .pipe-chart-wrap { height: 180px; padding: 6px 8px 2px; }
+  .pipe-mix-bar { height: 20px; }
+  .pipe-mix-bar span { font-size: 9px; }
+  .pipe-mix-legend { gap: 8px; font-size: 10px; }
+  .pipe-legend { gap: 10px; font-size: 10px; padding: 4px 10px 8px; }
 }
