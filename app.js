@@ -172,6 +172,15 @@
         }
         return line;
       } catch (e) { return ""; }
+    })() + (function () {
+      // Top-3 average MEDDIC qual (#20): exposes whether the concentration
+      // risk is also a defensibility risk.
+      try {
+        const scored = s.top3.filter((d) => d && d.meddic);
+        if (!scored.length) return "";
+        const avg = scored.reduce((a, d) => a + qualScore(d), 0) / scored.length;
+        return ` · Top-3 avg qual: ${avg.toFixed(1)}/8`;
+      } catch (e) { return ""; }
     })();
     return `
       <div class="kpi ${s.tone} kpi-clickable" id="kpi-conc" role="button" tabindex="0"
@@ -590,7 +599,7 @@
     const projGapArrow = projGapVsQuota >= 0 ? "▲" : "▼";
     const projGapAbs   = Math.abs(projGapVsQuota).toFixed(1);
     const projBandPct  = (acc * 100).toFixed(0);
-    const projMethTip  = `Projection = current ${series === "commit" ? "commit" : "best case"} + (bestcase − commit) × ${(BEST_TO_COMMIT*100).toFixed(0)}% − slippage drag (${(SLIP_RECUR*100).toFixed(0)}% recurrence on $${slipTotal.toFixed(1)}M). Band = ±${projBandPct}% TTM forecast accuracy.`;
+    const projMethTip  = `Projection = current ${series === "commit" ? "commit" : "best case"} + (bestcase − commit) × ${(BEST_TO_COMMIT*100).toFixed(0)}% − slippage drag (${(SLIP_RECUR*100).toFixed(0)}% recurrence on $${slipTotal.toFixed(1)}M). Band = ±${projBandPct}% TTM forecast accuracy. Note: projection treats all commit deals identically; deals with qual < 5/8 historically land ~35% less often than qual ≥ 6/8 — interpret the projection range accordingly.`;
 
     if (stat) {
       stat.innerHTML = `
@@ -702,6 +711,12 @@
   })();
   let sortByNextStep = false;
   let sortByMomentum = false;
+  let sortByQual    = false;
+  const LS_QUAL_KEY = "salespulse.qualWeakOnly";
+  let dealsWeakOnly = (function () {
+    try { return localStorage.getItem(LS_QUAL_KEY) === "1"; }
+    catch (e) { return false; }
+  })();
   function dealHealth(d) {
     if (!d.nextStep) return "missing";
     const n = d.nextStep.daysFromNow;
@@ -741,13 +756,60 @@
     return `<td class="next-step"><span class="ns-text">${action}</span> <span class="ns-chip ${chipCls}" title="${chipTitle}">▸ ${n}D</span></td>`;
   }
 
+  /* ---------- QUAL — MEDDIC 0-8 score (#20) ----------
+     Score = count of trues across M·E·D·D·I·C·P·C (MEDDPICC). Render shows
+     <X>/8 tone-colored + 8-cell segmented bar in MEDDPICC order so an AE can
+     see WHICH letters are missing at a glance. Weak commit = prob ≥ 70 AND
+     score < 5 — a deal that's forecast to land but isn't defensible. */
+  const MEDDIC_ORDER = ["M","E","D1","D2","I","C","P","Cm"];
+  const MEDDIC_LABEL = {
+    M:  "Metrics",
+    E:  "Economic Buyer",
+    D1: "Decision Criteria",
+    D2: "Decision Process",
+    I:  "Identify Pain",
+    C:  "Champion",
+    P:  "Paper Process",
+    Cm: "Competition"
+  };
+  function qualScore(d) {
+    if (!d || !d.meddic) return 0;
+    return MEDDIC_ORDER.reduce((n, k) => n + (d.meddic[k] ? 1 : 0), 0);
+  }
+  function qualTone(s) {
+    if (s >= 6) return "green";
+    if (s >= 4) return "amber";
+    return "red";
+  }
+  function isWeakCommit(d) {
+    return d && d.prob >= 70 && qualScore(d) < 5;
+  }
+  function qualCell(d) {
+    if (!d.meddic) return `<td class="num qual-cell"><span class="muted">—</span></td>`;
+    const s = qualScore(d);
+    const tone = qualTone(s);
+    const cells = MEDDIC_ORDER.map((k) => {
+      const on = !!d.meddic[k];
+      return `<span class="qual-bar-cell ${on ? "on" : "off"}" title="${MEDDIC_LABEL[k]}: ${on ? "✓" : "✗"}">${k.charAt(0)}</span>`;
+    }).join("");
+    const missed = MEDDIC_ORDER.filter((k) => !d.meddic[k]).map((k) => MEDDIC_LABEL[k]);
+    const tipBase = `MEDDPICC ${s}/8 — ` + (missed.length ? `missing: ${missed.join(", ")}` : `all checks complete`);
+    const weakChip = isWeakCommit(d)
+      ? ` <span class="qual-weak" title="Weak commit: ≥70% prob but qual &lt; 5/8 — high slip risk">!</span>`
+      : "";
+    return `<td class="num qual-cell" title="${esc(tipBase)}">`
+         + `<span class="qual-num ${tone}">${s}/8</span>${weakChip}`
+         + `<span class="qual-bar" aria-label="MEDDPICC checks">${cells}</span></td>`;
+  }
+
   function renderDeals(rows) {
     const tbody = $("deals-tbody");
     if (!tbody) return;
     if (rows.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="12" style="text-align:center;color:var(--dim);padding:18px;">NO MATCHING DEALS</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="13" style="text-align:center;color:var(--dim);padding:18px;">NO MATCHING DEALS</td></tr>`;
       setText("deals-count", "0 OPEN · $0.0M");
       renderDealsHealth([]);
+      renderQualHealth([]);
       return;
     }
     const total = rows.reduce((a, r) => a + r.amount, 0);
@@ -755,7 +817,9 @@
     // Pre-compute the top-3 set so each row knows whether to render the
     // TOP-3 CONCENTRATION (#11) star badge in the ACCOUNT column.
     const top3 = topAccountSet();
-    if (sortByMomentum) {
+    if (sortByQual) {
+      rows = rows.slice().sort((a, b) => qualScore(b) - qualScore(a) || b.amount - a.amount);
+    } else if (sortByMomentum) {
       // Highest momentum first (descending). Stable secondary sort by amount.
       rows = rows.slice().sort((a, b) => ((b.engagement && b.engagement.score) || 0) - ((a.engagement && a.engagement.score) || 0) || b.amount - a.amount);
     } else if (sortByNextStep) {
@@ -777,6 +841,7 @@
           <td class="num">$${formatK(d.amount)}</td>
           <td class="num ${probCls}">${d.prob}%</td>
           ${momentumCell(d)}
+          ${qualCell(d)}
           <td>${esc(d.close)}</td>
           ${nextStepCell(d)}
           <td>${esc(d.owner)}</td>
@@ -787,6 +852,7 @@
         </tr>`;
     }).join("");
     renderDealsHealth(rows);
+    renderQualHealth(rows);
   }
 
   function renderDealsHealth(rows) {
@@ -820,6 +886,38 @@
     }
   }
 
+  /* renderQualHealth — panel-head micro-stat for #20.
+     Shows average MEDDIC score across the rendered rows + count of
+     WEAK-COMMIT deals (prob ≥ 70 AND qual < 5). The weak count is
+     clickable and persists a filter (dealsWeakOnly) in localStorage. */
+  function renderQualHealth(rows) {
+    const el = $("deals-qual");
+    if (!el) return;
+    const scored = rows.filter((d) => d && d.meddic);
+    const avg = scored.length
+      ? scored.reduce((a, d) => a + qualScore(d), 0) / scored.length
+      : 0;
+    const weakCt = rows.filter(isWeakCommit).length;
+    const weakCls   = weakCt > 0 ? "bad clickable" : "muted";
+    const activeCls = dealsWeakOnly ? " active" : "";
+    el.innerHTML =
+      `<span class="dh-label">QUAL HEALTH:</span> ` +
+      `<span class="dh-good">${avg.toFixed(1)}/8 AVG</span> · ` +
+      `<span class="dh-bad ${weakCls}${activeCls}" id="qh-weak-toggle" title="${weakCt > 0 ? (dealsWeakOnly ? "Click to clear filter" : "Click to filter table to WEAK-COMMIT deals (≥70% prob, qual < 5/8)") : "No weak-commit deals"}" role="${weakCt > 0 ? "button" : "img"}" tabindex="${weakCt > 0 ? "0" : "-1"}">${weakCt} WEAK-COMMIT</span>`;
+    const tog = $("qh-weak-toggle");
+    if (tog && weakCt > 0) {
+      const fire = () => {
+        dealsWeakOnly = !dealsWeakOnly;
+        try { localStorage.setItem(LS_QUAL_KEY, dealsWeakOnly ? "1" : "0"); } catch (e) {}
+        applyDealFilters();
+      };
+      tog.addEventListener("click", fire);
+      tog.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); fire(); }
+      });
+    }
+  }
+
   function applyDealFilters() {
     const q  = ($("deal-search").value || "").toLowerCase().trim();
     const rg = $("deal-region").value;
@@ -831,6 +929,7 @@
       .filter((d) => (!myDealsActive || d.owner === currentRep))
       .filter((d) => (currentMotion === "all" || d.motion === currentMotion))
       .filter((d) => (!dealsRiskOnly || dealHealth(d) === "overdue" || dealHealth(d) === "missing"))
+      .filter((d) => (!dealsWeakOnly || isWeakCommit(d)))
       .sort((a, b) => b.amount - a.amount);
     renderDeals(rows);
   }
@@ -843,9 +942,10 @@
     if (thNs) {
       thNs.addEventListener("click", () => {
         sortByNextStep = !sortByNextStep;
-        if (sortByNextStep) sortByMomentum = false;
+        if (sortByNextStep) { sortByMomentum = false; sortByQual = false; }
         thNs.classList.toggle("sorted", sortByNextStep);
         const thMo = $("th-momentum"); if (thMo) thMo.classList.remove("sorted");
+        const thQ  = $("th-qual");     if (thQ)  thQ.classList.remove("sorted");
         applyDealFilters();
       });
     }
@@ -853,9 +953,21 @@
     if (thMo) {
       thMo.addEventListener("click", () => {
         sortByMomentum = !sortByMomentum;
-        if (sortByMomentum) sortByNextStep = false;
+        if (sortByMomentum) { sortByNextStep = false; sortByQual = false; }
         thMo.classList.toggle("sorted", sortByMomentum);
         const thNs2 = $("th-nextstep"); if (thNs2) thNs2.classList.remove("sorted");
+        const thQ2  = $("th-qual");     if (thQ2)  thQ2.classList.remove("sorted");
+        applyDealFilters();
+      });
+    }
+    const thQu = $("th-qual");
+    if (thQu) {
+      thQu.addEventListener("click", () => {
+        sortByQual = !sortByQual;
+        if (sortByQual) { sortByMomentum = false; sortByNextStep = false; }
+        thQu.classList.toggle("sorted", sortByQual);
+        const thMo2 = $("th-momentum"); if (thMo2) thMo2.classList.remove("sorted");
+        const thNs3 = $("th-nextstep"); if (thNs3) thNs3.classList.remove("sorted");
         applyDealFilters();
       });
     }

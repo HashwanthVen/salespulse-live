@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>SALESPULSE LIVE · TERMINAL</title>
   <meta name="description" content="SalesPulse Live — Bloomberg-style sales pipeline command center for VPs of Sales, RevOps, and AEs. Synthetic data only." />
-  <link rel="stylesheet" href="styles.css?v=0.15.0" />
+  <link rel="stylesheet" href="styles.css?v=0.16.0" />
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to main content</a>
@@ -143,6 +143,7 @@
         <span class="title" id="deals-title">TOP OPEN DEALS</span>
         <span class="sub" id="deals-count"></span>
         <span class="deals-health" id="deals-health" aria-live="polite"></span>
+        <span class="deals-health" id="deals-qual" aria-live="polite"></span>
         <div class="right controls">
           <input id="deal-search" class="input" type="search" placeholder="SEARCH ACCOUNT" aria-label="Search account" />
           <select id="deal-region" class="input" aria-label="Filter region">
@@ -169,6 +170,7 @@
               <th class="num">AMOUNT</th>
               <th class="num">PROB</th>
               <th class="num sortable" id="th-momentum" title="Sort by momentum score">MOMENTUM</th>
+              <th class="num sortable" id="th-qual" title="Sort by MEDDIC qualification score (0–8)">QUAL</th>
               <th>CLOSE</th>
               <th class="sortable" id="th-nextstep" title="Sort by next-step health: missing → overdue → on-track">NEXT STEP</th>
               <th>OWNER</th>
@@ -391,6 +393,7 @@
       </div>
       <div class="panel-body">
         <ul class="rel-list">
+          <li><span class="ver">v0.16</span> <b>QUAL column on TOP OPEN DEALS — MEDDIC 0-8 score + weak-commit alarm</b> — completes the daily-use trinity (momentum + next-step + qual) on the most-trafficked panel. New sortable <b>QUAL</b> column between MOMENTUM and CLOSE renders a tone-colored <i>X/8</i> score (green ≥ 6 · amber 4-5 · red ≤ 3) + an 8-cell segmented bar in MEDDPICC order (M·E·D·D·I·C·P·C) so an AE can see at a glance <i>which</i> letters are missing without opening the deal. Hover the bar to list the missed checks by name. Panel-head micro-stat: <b>QUAL HEALTH: X.X/8 AVG · N WEAK-COMMIT DEALS</b> where weak = <i>prob ≥ 70 AND qual &lt; 5/8</i> — clickable to filter the table to just those deals (persisted in localStorage). TOP-3 CONCENTRATION tooltip now appends top-3 avg qual. PROJECTED Q-END methodology tooltip notes that qual &lt; 5/8 deals historically land 35% less often than qual ≥ 6/8 — so the projection range should be read with that lens. New AI insight bullet names Northwind ($2.4M, 4/8) as the single largest commit-defensibility gap in the book. Mobile (≤480px): column collapses to numeric only, tap reveals the bar · closes #20</li>
           <li><span class="ver">v0.15</span> <b>AT-RISK REPS — auto-derived coaching list</b> — saves Sales Mgrs ~30 min of pre-1:1 prep. New panel above REPS+SEGMENTS row surfaces every rep who trips any of 6 watchlist rules: <i>attain &lt; 70 · activity &lt; 65 · over-commit + behind · top deal missing next step · cold top deal (engagement &lt; 40) · WoW attain ≤ −3pts</i>. Each row shows the rep + region + bias chip, the highest-severity reason chip (RED if 2+ rules, AMBER if 1), an auto-generated one-line rationale that combines all triggered rules, and a suggested action chip (<b>PIPE REVIEW · 1:1 COACH · RAMP CHECK · DEAL INSPECT</b>). Panel header rollup: <i>N reps at risk · N need 1:1 this week</i> (or <i>ALL REPS ON TRACK</i> in green). Each row is clickable — scrolls to the REP LEADERBOARD and pulses that rep. TOP-3 CONCENTRATION tooltip now appends top-3 owners and flags any owner who's on the coaching list — concentration + rep risk now visibly compound. New <b>RISKREP</b> ticker symbol + new AI insight bullet quantifies which 5 of 6 reps are flagged + how concentration risk overlaps. New commands <b>GO COACH / GO RISK / GO ATRISK</b>. Mobile: each row's rationale wraps under the rep name; action chip remains visible · closes #21</li>
           <li><span class="ver">v0.14</span> <b>REP LEADERBOARD: FCST ACC + BIAS columns (last 4Q) + reliability rollup</b> — answers the CRO's #1 Friday-call question (<i>"whose forecast can I actually trust?"</i>) before commit gets rolled up. Two new right-aligned columns: <b>FCST ACC</b> shows last-4Q rep forecast accuracy %, tone-colored green ≥ 80 / amber 65–79 / red &lt; 65. <b>BIAS</b> chip flags <i>RELIABLE</i> (green), <i>SANDBAG</i> (amber), or <i>OVER</i> (red) with a hover tooltip surfacing the actual last-4Q (actual−commit)/commit values + a 4-dot sparkline of the same. Panel header gains a <b>RELIABILITY</b> rollup: % of pipeline-weighted commit from RELIABLE forecasters + counts of sandbaggers / over-committers. FORECAST vs QUOTA chart caption appends a reliability whisper estimating $$ over-commit risk and $$ sandbag upside hidden in the current commit. WHAT CHANGED SINCE LAST FORECAST cross-references with a <b>RELY/SAND/OVER</b> mini-chip next to each moving rep — so a +10pt jump from a SANDBAGGER reads differently than the same jump from an OVER-COMMITTER. New <b>RELY</b> ticker · new AI insight bullet quantifies Yamada's likely $0.4M overstatement + Sokolova's $1.2M hidden upside. PROJECTED Q-END comment now flags the future weight-by-reliability follow-up · closes #19</li>
           <li><span class="ver">v0.13</span> <b>NEXT-QUARTER COVERAGE panel</b> — surfaces the board+CFO conversation that's invisible today. New 3-column panel renders open pipe by close-date quarter for Q2 (current) / Q3 / Q4: big tone-colored coverage ratio (green ≥ 3x · amber 0.7–1.0× · red < 0.7×) vs the 3.0x target, weighted/unweighted/deal-count secondaries, and a <i>NEED $XM MORE PIPE TO HIT 3x</i> action row computed at render. Shared horizontal-bar viz beneath the columns shows unweighted-pipe-to-target visually, with a dashed 3x marker. Q2 reconciles exactly with existing Weighted Pipeline + Coverage KPIs — renders a <i>⚠ MISMATCH</i> warning if they drift. New <b>Q3COV / Q4COV</b> ticker symbols + AI insight bullet cross-references the PIPELINE CREATED panel. <b>GO COV / GO COVERAGE</b> commands. Story this quarter: <i>Q3 is 2.0x — alarm bell · need $61.6M more unweighted in 18 weeks</i> · closes #16</li>
@@ -421,7 +424,7 @@
     <span class="seg right"><span class="l">SYS</span> <span id="clock2">--:--:--</span></span>
   </div>
 
-  <script src="data.js?v=0.15.0"></script>
-  <script src="app.js?v=0.15.0"></script>
+  <script src="data.js?v=0.16.0"></script>
+  <script src="app.js?v=0.16.0"></script>
 </body>
 </html>

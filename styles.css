@@ -426,6 +426,39 @@ main { padding: 10px 12px 50px; max-width: 1600px; margin: 0 auto; }
   .momentum { min-width: 56px; }
 }
 
+/* QUAL (MEDDIC 0-8) — #20.
+   Compact column rendering: tone-colored X/8 number + 8-cell segmented bar
+   in MEDDPICC order. Hover the bar to see which letters are missing. */
+.qual-cell { white-space: nowrap; min-width: 110px; }
+.qual-num  { font-weight: 700; font-size: 12px; letter-spacing: 0.02em; }
+.qual-num.green { color: var(--green); }
+.qual-num.amber { color: var(--amber); }
+.qual-num.red   { color: var(--red); }
+.qual-weak {
+  display: inline-block; margin-left: 4px; padding: 0 4px;
+  font-size: 9px; font-weight: 700; color: var(--bg);
+  background: var(--red); border-radius: 1px; vertical-align: 1px;
+}
+.qual-bar {
+  display: inline-grid; grid-template-columns: repeat(8, 1fr);
+  gap: 1px; margin-left: 6px; vertical-align: middle;
+}
+.qual-bar-cell {
+  width: 9px; height: 11px; font-size: 8px; line-height: 11px;
+  text-align: center; font-weight: 700; letter-spacing: 0;
+  background: var(--border); color: var(--dim);
+}
+.qual-bar-cell.on  { background: var(--green-soft); color: var(--green); }
+.qual-bar-cell.off { background: rgba(255,80,80,0.18); color: var(--red); }
+.data-table thead th#th-qual { cursor: pointer; }
+.data-table thead th#th-qual.sorted { color: var(--green); }
+@media (max-width: 480px) {
+  .qual-cell  { min-width: 44px; }
+  .qual-bar   { display: none; }
+  .qual-cell:active .qual-bar,
+  .qual-cell:focus  .qual-bar { display: inline-grid; }
+}
+
 /* WHAT CHANGED SINCE LAST FORECAST — 4-card grid (stacks ≤720px).
    Card style is minimal (no rounded corners / shadows) to fit the
    terminal aesthetic. Lists inside cards are dense, tabular. */
