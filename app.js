@@ -4309,6 +4309,20 @@
       flash("UNKNOWN LENS: " + p.toUpperCase() + " — try CRO/MGR/AE/CFO/CMO/BOARD/FULL", "err");
       return;
     }
+    if (cmd === "GO F1") { setPage("overview", true); flash("PAGE: OVERVIEW"); return; }
+    if (cmd === "GO F2") { setPage("pipeline", true); flash("PAGE: PIPELINE"); return; }
+    if (cmd === "GO F3") { setPage("forecast", true); flash("PAGE: FORECAST"); return; }
+    if (cmd === "GO F4") { setPage("deals",    true); flash("PAGE: DEALS"); return; }
+    if (cmd === "GO F5") { setPage("team",     true); flash("PAGE: TEAM"); return; }
+    if (cmd === "GO F6") { setPage("intel",    true); flash("PAGE: INTEL"); return; }
+    if (cmd === "GO F7") { setPage("history",  true); flash("PAGE: HISTORY"); return; }
+    if (cmd === "GO OVERVIEW" || cmd === "GO PAGE OVERVIEW") { setPage("overview", true); flash("PAGE: OVERVIEW"); return; }
+    if (cmd === "GO PIPELINE" || cmd === "GO PAGE PIPELINE") { setPage("pipeline", true); flash("PAGE: PIPELINE"); return; }
+    if (cmd === "GO FORECAST PAGE" || cmd === "GO PAGE FORECAST") { setPage("forecast", true); flash("PAGE: FORECAST"); return; }
+    if (cmd === "GO DEALS PAGE" || cmd === "GO PAGE DEALS")     { setPage("deals", true); flash("PAGE: DEALS"); return; }
+    if (cmd === "GO TEAM PAGE" || cmd === "GO PAGE TEAM")       { setPage("team", true); flash("PAGE: TEAM"); return; }
+    if (cmd === "GO INTEL" || cmd === "GO PAGE INTEL")          { setPage("intel", true); flash("PAGE: INTEL"); return; }
+    if (cmd === "GO HISTORY" || cmd === "GO PAGE HISTORY")      { setPage("history", true); flash("PAGE: HISTORY"); return; }
     flash(`UNKNOWN CMD: ${cmd} · type HELP`, "err");
   }
 
@@ -4599,6 +4613,167 @@
     return n.toString();
   }
 
+  /* ---------- FUNCTION PAGES (#37) ----------
+     Splits the 22-panel single-scroll into Bloomberg-style F1-F7 task-scoped
+     pages. Repurposes the existing .fkeys nav row. Uses class-based show/hide
+     so DOM stays intact and all computed totals/insights remain in sync.
+     LENS coexistence: LENS rules use ID selectors (high specificity) and
+     win — element hidden by lens stays hidden across page switches.
+  */
+  const LS_PAGE_KEY = "salespulse.activePage";
+  const LS_PAGE_INTRO_KEY = "salespulse.pagesIntroSeen";
+  const PAGES = {
+    overview: { key:"F1", num:1, label:"OVERVIEW", short:"OVERVIEW",
+                panels:["hero","dashboard","inbox","changed","yoy","insights"] },
+    pipeline: { key:"F2", num:2, label:"PIPELINE", short:"PIPELINE",
+                panels:["funnel","pipegen","segments","forward-cov"] },
+    forecast: { key:"F3", num:3, label:"FORECAST", short:"FORECAST",
+                panels:["forecast","scenario","forward-cov","erosion"] },
+    deals:    { key:"F4", num:4, label:"DEALS",    short:"DEALS",
+                panels:["deals","slippage","winloss","risks"] },
+    team:     { key:"F5", num:5, label:"TEAM",     short:"TEAM",
+                panels:["team-attain","reps","at-risk-reps","audience"] },
+    intel:    { key:"F6", num:6, label:"INTEL",    short:"INTEL",
+                panels:["benchmarks","insights","risks","winloss"] },
+    history:  { key:"F7", num:7, label:"HISTORY",  short:"HISTORY",
+                panels:["release"] }
+  };
+  const PAGE_ORDER = ["overview","pipeline","forecast","deals","team","intel","history"];
+
+  let currentPage = (function () {
+    try {
+      const m = (location.hash || "").match(/page=([a-z]+)/);
+      if (m && PAGES[m[1]]) return m[1];
+      const v = localStorage.getItem(LS_PAGE_KEY);
+      if (v && PAGES[v]) return v;
+    } catch (e) {}
+    return "overview";
+  })();
+
+  function tagPanelsByPage() {
+    const map = {};
+    Object.keys(PAGES).forEach((pid) => {
+      PAGES[pid].panels.forEach((id) => {
+        if (!map[id]) map[id] = [];
+        if (map[id].indexOf(pid) === -1) map[id].push(pid);
+      });
+    });
+    Object.keys(map).forEach((id) => {
+      let el = document.getElementById(id);
+      if (!el && id === "hero") el = document.querySelector("section.hero");
+      if (!el) return;
+      el.setAttribute("data-pages", map[id].join(" "));
+      map[id].forEach((pid) => el.classList.add("pg-" + pid));
+    });
+  }
+
+  function applyPage(scroll) {
+    const main = $("main");
+    if (!main) return;
+    main.setAttribute("data-page", currentPage);
+    document.querySelectorAll("nav.fkeys .pg-pill").forEach((b) => {
+      const a = b.dataset.page === currentPage;
+      b.classList.toggle("active", a);
+      b.setAttribute("aria-selected", a ? "true" : "false");
+    });
+    const sp = $("status-page-val");
+    if (sp) sp.textContent = (PAGES[currentPage] || PAGES.overview).short;
+    try {
+      const raw = (location.hash || "").replace(/^#/, "");
+      const parts = raw.split("&").filter((p) => p && !p.startsWith("page="));
+      parts.push("page=" + currentPage);
+      const next = "#" + parts.join("&");
+      if (location.hash !== next) history.replaceState(null, "", next);
+    } catch (e) {}
+    try { localStorage.setItem(LS_PAGE_KEY, currentPage); } catch (e) {}
+    const ann = $("page-announce");
+    if (ann) ann.textContent = "Page: " + (PAGES[currentPage] || PAGES.overview).label;
+    if (scroll) {
+      try { window.scrollTo({ top: 0, behavior: "auto" }); } catch (e) {}
+    }
+    try { renderInsight(); } catch (e) {}
+  }
+
+  function setPage(p, scroll) {
+    if (!PAGES[p]) return;
+    currentPage = p;
+    applyPage(scroll !== false);
+  }
+
+  function buildPageNav() {
+    // The HTML already ships the 7 page-pills + FEEDBACK link, so just bind.
+    // Nothing else to construct — kept as a function for clarity / future use.
+  }
+
+  function bindPagePills() {
+    document.querySelectorAll("nav.fkeys .pg-pill").forEach((b) => {
+      b.addEventListener("click", () => {
+        setPage(b.dataset.page, true);
+        try { flash("PAGE: " + PAGES[b.dataset.page].label); } catch (e) {}
+      });
+    });
+  }
+
+  function bindPageShortcuts() {
+    document.addEventListener("keydown", (e) => {
+      if (e.shiftKey || e.ctrlKey || e.altKey || e.metaKey) return;
+      const t = e.target;
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
+      let pid = null;
+      if (/^F[1-7]$/.test(e.key)) {
+        pid = PAGE_ORDER[parseInt(e.key.slice(1), 10) - 1];
+      } else if (/^[1-7]$/.test(e.key)) {
+        pid = PAGE_ORDER[parseInt(e.key, 10) - 1];
+      }
+      if (!pid) return;
+      e.preventDefault();
+      setPage(pid, true);
+      try { flash("PAGE: " + PAGES[pid].label); } catch (e2) {}
+    });
+    window.addEventListener("hashchange", () => {
+      const m = (location.hash || "").match(/page=([a-z]+)/);
+      if (m && PAGES[m[1]] && m[1] !== currentPage) setPage(m[1], false);
+    });
+  }
+
+  // Cross-page jump helper — first switches page if target panel is on a
+  // different page, then scrolls + pulses. Exposed globally for handlers
+  // that pre-date this feature (INBOX [JUMP], stage-row clicks, etc.).
+  function jumpToPanel(panelId) {
+    if (!panelId) return;
+    const el = document.getElementById(panelId);
+    if (!el) return;
+    let targetPage = null;
+    Object.keys(PAGES).forEach((pid) => {
+      if (!targetPage && PAGES[pid].panels.indexOf(panelId) !== -1) targetPage = pid;
+    });
+    if (targetPage && targetPage !== currentPage) setPage(targetPage, false);
+    setTimeout(() => {
+      try { el.scrollIntoView({ behavior: "smooth", block: "start" }); } catch (e) {}
+      el.classList.add("highlight-pulse");
+      setTimeout(() => el.classList.remove("highlight-pulse"), 2000);
+    }, 80);
+  }
+  try { window.spJumpToPanel = jumpToPanel; } catch (e) {}
+
+  function showPagesIntro() {
+    try {
+      if (localStorage.getItem(LS_PAGE_INTRO_KEY) === "1") return;
+    } catch (e) {}
+    const nav = document.querySelector("nav.fkeys");
+    if (!nav || nav.nextElementSibling && nav.nextElementSibling.classList && nav.nextElementSibling.classList.contains("pages-intro")) return;
+    const cal = document.createElement("div");
+    cal.className = "pages-intro";
+    cal.setAttribute("role", "status");
+    cal.innerHTML = '<span>★ <b>NEW: FUNCTION PAGES</b> — press <b>F1-F7</b> or click a pill above to switch task-scoped pages. Your active page is remembered.</span> <button type="button" class="pi-x" aria-label="Dismiss">GOT IT ✕</button>';
+    nav.parentNode.insertBefore(cal, nav.nextSibling);
+    const btn = cal.querySelector(".pi-x");
+    if (btn) btn.addEventListener("click", () => {
+      cal.remove();
+      try { localStorage.setItem(LS_PAGE_INTRO_KEY, "1"); } catch (e) {}
+    });
+  }
+
   /* ---------- INIT ---------- */
   document.addEventListener("DOMContentLoaded", () => {
     renderTicker();
@@ -4639,6 +4814,11 @@
     applyLens();
     bindLensPills();
     bindLensShortcuts();
+    tagPanelsByPage();
+    bindPagePills();
+    bindPageShortcuts();
+    applyPage(false);
+    setTimeout(showPagesIntro, 600);
     renderInsight();
     bindRegen();
     bindCommand();
