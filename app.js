@@ -150,9 +150,13 @@
     const gapArrow = s.gap >= 0 ? "▲" : "▼";
     const gapWord  = s.gap >= 0 ? "STILL COVERED BY" : "MISS BY";
     const gapCls   = s.gap >= 0 ? "good" : "bad";
+    const top3NoNs = s.top3.filter((d) => !d.nextStep).length;
+    const nsLine   = top3NoNs > 0
+      ? ` · ⚠ ${top3NoNs} of top-3 have NO NEXT STEP — pressure-test in pipe review.`
+      : "";
     const tooltip = "If top 3 slip: " + s.top3.map((d) =>
       `${d.account} ($${(d.amount/1e6).toFixed(2)}M × ${d.prob}% = $${((d.amount*d.prob/100)/1e6).toFixed(2)}M weighted)`
-    ).join(" · ");
+    ).join(" · ") + nsLine;
     return `
       <div class="kpi ${s.tone} kpi-clickable" id="kpi-conc" role="button" tabindex="0"
            data-accounts="${esc(s.top3.map((d) => d.account).join("|"))}"
@@ -175,6 +179,7 @@
       const region = $("deal-region");   if (region) region.value = "all";
       const fcst   = $("deal-forecast"); if (fcst)   fcst.value   = "all";
       if (myDealsActive) { myDealsActive = false; updateMyDealsBtn(); }
+      if (dealsRiskOnly) { dealsRiskOnly = false; try { localStorage.setItem(LS_RISK_KEY, "0"); } catch (e) {} }
       applyDealFilters();
       document.getElementById("deals").scrollIntoView({ behavior: "smooth", block: "start" });
       // Slight delay so the smooth-scroll lands before the pulse starts.
@@ -503,12 +508,46 @@
   })();
   let myDealsActive = false;
 
+  /* ---------- NEXT STEP HEALTH (#15) ----------
+     Per-deal hygiene surfacing. A deal with no next step is invisible to
+     the manager; an overdue next step is the cheapest "is this real?"
+     signal. Bucketing: missing > overdue > soon > on. Header stat is a
+     rollup; clicking the red count filters to overdue+missing only. */
+  const LS_RISK_KEY = "salespulse.dealsRiskOnly";
+  let dealsRiskOnly = (function () {
+    try { return localStorage.getItem(LS_RISK_KEY) === "1"; }
+    catch (e) { return false; }
+  })();
+  let sortByNextStep = false;
+  function dealHealth(d) {
+    if (!d.nextStep) return "missing";
+    const n = d.nextStep.daysFromNow;
+    if (n < 0) return "overdue";
+    if (n <= 7) return "on";
+    return "soon";
+  }
+  const HEALTH_RANK = { missing: 0, overdue: 1, soon: 2, on: 3 };
+  function nextStepCell(d) {
+    if (!d.nextStep) {
+      return `<td class="next-step"><span class="ns-missing" title="No next step logged — un-defensible in pipe review">MISSING</span></td>`;
+    }
+    const n = d.nextStep.daysFromNow;
+    const action = esc(d.nextStep.action);
+    if (n < 0) {
+      return `<td class="next-step"><span class="ns-text">${action}</span> <span class="ns-chip red" title="Due ${esc(d.nextStep.dueDate)} — ${Math.abs(n)}d past due">◀ ${Math.abs(n)}D OVERDUE</span></td>`;
+    }
+    const chipCls = n <= 7 ? "green" : "amber";
+    const chipTitle = n <= 7 ? `Due ${esc(d.nextStep.dueDate)}` : `Due in ${n}d — no near-term action, drift risk`;
+    return `<td class="next-step"><span class="ns-text">${action}</span> <span class="ns-chip ${chipCls}" title="${chipTitle}">▸ ${n}D</span></td>`;
+  }
+
   function renderDeals(rows) {
     const tbody = $("deals-tbody");
     if (!tbody) return;
     if (rows.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;color:var(--dim);padding:18px;">NO MATCHING DEALS</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="11" style="text-align:center;color:var(--dim);padding:18px;">NO MATCHING DEALS</td></tr>`;
       setText("deals-count", "0 OPEN · $0.0M");
+      renderDealsHealth([]);
       return;
     }
     const total = rows.reduce((a, r) => a + r.amount, 0);
@@ -516,6 +555,9 @@
     // Pre-compute the top-3 set so each row knows whether to render the
     // TOP-3 CONCENTRATION (#11) star badge in the ACCOUNT column.
     const top3 = topAccountSet();
+    if (sortByNextStep) {
+      rows = rows.slice().sort((a, b) => HEALTH_RANK[dealHealth(a)] - HEALTH_RANK[dealHealth(b)] || b.amount - a.amount);
+    }
     tbody.innerHTML = rows.map((d) => {
       const probCls = d.prob >= 70 ? "green" : d.prob >= 40 ? "amber" : "red";
       const fcst = (d.forecast || "upside").toLowerCase();
@@ -526,12 +568,13 @@
         ? `<span class="deal-top3-star" title="Top-3 account — single-point-of-failure deal">★</span> `
         : "";
       return `
-        <tr data-account="${esc(d.account)}">
+        <tr data-account="${esc(d.account)}" data-health="${dealHealth(d)}">
           <td>${star}<b class="green">${esc(d.account)}</b></td>
           <td>${esc(d.stage)}</td>
           <td class="num">$${formatK(d.amount)}</td>
           <td class="num ${probCls}">${d.prob}%</td>
           <td>${esc(d.close)}</td>
+          ${nextStepCell(d)}
           <td>${esc(d.owner)}</td>
           <td>${esc(d.region)}</td>
           <td>${esc(d.segment)}</td>
@@ -539,7 +582,40 @@
           <td><span class="status-pill ${fcst}">${esc(d.forecast)}</span></td>
         </tr>`;
     }).join("");
+    renderDealsHealth(rows);
   }
+
+  function renderDealsHealth(rows) {
+    const el = $("deals-health");
+    if (!el) return;
+    let onCt = 0, soonCt = 0, badCt = 0;
+    rows.forEach((d) => {
+      const h = dealHealth(d);
+      if (h === "missing" || h === "overdue") badCt++;
+      else if (h === "soon") soonCt++;
+      else onCt++;
+    });
+    const badCls = badCt > 0 ? "bad clickable" : "muted";
+    const activeCls = dealsRiskOnly ? " active" : "";
+    el.innerHTML =
+      `<span class="dh-label">NEXT-STEP HEALTH:</span> ` +
+      `<span class="dh-good">${onCt}✓</span> · ` +
+      `<span class="dh-warn">${soonCt}●</span> · ` +
+      `<span class="dh-bad ${badCls}${activeCls}" id="dh-bad-toggle" title="${badCt > 0 ? (dealsRiskOnly ? "Click to clear filter" : "Click to filter table to OVERDUE + MISSING only") : "No overdue or missing deals"}" role="${badCt > 0 ? "button" : "img"}" tabindex="${badCt > 0 ? "0" : "-1"}">${badCt}✗</span>`;
+    const tog = $("dh-bad-toggle");
+    if (tog && badCt > 0) {
+      const fire = () => {
+        dealsRiskOnly = !dealsRiskOnly;
+        try { localStorage.setItem(LS_RISK_KEY, dealsRiskOnly ? "1" : "0"); } catch (e) {}
+        applyDealFilters();
+      };
+      tog.addEventListener("click", fire);
+      tog.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); fire(); }
+      });
+    }
+  }
+
   function applyDealFilters() {
     const q  = ($("deal-search").value || "").toLowerCase().trim();
     const rg = $("deal-region").value;
@@ -550,6 +626,7 @@
       .filter((d) => (fc === "all" || d.forecast === fc))
       .filter((d) => (!myDealsActive || d.owner === currentRep))
       .filter((d) => (currentMotion === "all" || d.motion === currentMotion))
+      .filter((d) => (!dealsRiskOnly || dealHealth(d) === "overdue" || dealHealth(d) === "missing"))
       .sort((a, b) => b.amount - a.amount);
     renderDeals(rows);
   }
@@ -558,6 +635,14 @@
       const el = $(id); if (el) el.addEventListener("input", applyDealFilters);
       if (el) el.addEventListener("change", applyDealFilters);
     });
+    const thNs = $("th-nextstep");
+    if (thNs) {
+      thNs.addEventListener("click", () => {
+        sortByNextStep = !sortByNextStep;
+        thNs.classList.toggle("sorted", sortByNextStep);
+        applyDealFilters();
+      });
+    }
   }
   function updateMyDealsBtn() {
     const btn = $("deal-mine");
@@ -812,6 +897,7 @@
       const region = $("deal-region");   if (region) region.value = "all";
       const fcst   = $("deal-forecast"); if (fcst)   fcst.value   = "all";
       if (myDealsActive) { myDealsActive = false; updateMyDealsBtn(); }
+      if (dealsRiskOnly) { dealsRiskOnly = false; try { localStorage.setItem(LS_RISK_KEY, "0"); } catch (e) {} }
       if (currentMotion !== "all") setMotion("all");
       applyDealFilters();
       row = find();

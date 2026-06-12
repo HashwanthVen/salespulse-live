@@ -125,19 +125,22 @@ window.SALESPULSE_DATA = {
      Distribution: ~58% new / 42% expansion; every region and segment is
      represented in BOTH motions so the lens filter never empties a slice. */
   topDeals: [
-    { account: "Northwind Industries",   stage: "Negotiation",  amount: 2400000, prob: 75, close: "2026-06-28", owner: "S. Rivera",   forecast: "commit",   region: "NA",   segment: "Enterprise",  motion: "new" },
-    { account: "Contoso Manufacturing",  stage: "Proposal",     amount: 1850000, prob: 60, close: "2026-07-15", owner: "L. Patel",    forecast: "bestcase", region: "EMEA", segment: "Enterprise",  motion: "expansion" },
-    { account: "Fabrikam Logistics",     stage: "Discovery",    amount: 1200000, prob: 35, close: "2026-08-10", owner: "M. Chen",     forecast: "upside",   region: "APAC", segment: "Mid-Market",  motion: "new" },
-    { account: "Adventure Works",        stage: "Negotiation",  amount: 1100000, prob: 80, close: "2026-06-25", owner: "S. Rivera",   forecast: "commit",   region: "NA",   segment: "Enterprise",  motion: "expansion" },
-    { account: "Tailwind Traders",       stage: "Proposal",     amount:  980000, prob: 55, close: "2026-07-08", owner: "J. Okafor",   forecast: "bestcase", region: "NA",   segment: "Enterprise",  motion: "new" },
-    { account: "Wide World Importers",   stage: "Qualified",    amount:  860000, prob: 25, close: "2026-08-22", owner: "L. Patel",    forecast: "upside",   region: "EMEA", segment: "Mid-Market",  motion: "new" },
-    { account: "Lucerne Publishing",     stage: "Negotiation",  amount:  720000, prob: 70, close: "2026-06-30", owner: "M. Chen",     forecast: "commit",   region: "EMEA", segment: "Mid-Market",  motion: "new" },
-    { account: "Litware Inc.",           stage: "Proposal",     amount:  680000, prob: 50, close: "2026-07-20", owner: "K. Yamada",   forecast: "bestcase", region: "APAC", segment: "Enterprise",  motion: "expansion" },
-    { account: "Proseware Systems",      stage: "Discovery",    amount:  540000, prob: 30, close: "2026-08-30", owner: "J. Okafor",   forecast: "upside",   region: "NA",   segment: "Mid-Market",  motion: "new" },
-    { account: "Margie's Travel",        stage: "Negotiation",  amount:  480000, prob: 65, close: "2026-07-05", owner: "S. Rivera",   forecast: "commit",   region: "NA",   segment: "SMB",         motion: "expansion" },
-    { account: "Trey Research",          stage: "Proposal",     amount:  420000, prob: 55, close: "2026-07-18", owner: "L. Patel",    forecast: "bestcase", region: "EMEA", segment: "Mid-Market",  motion: "expansion" },
-    { account: "Graphic Design Inst.",   stage: "Negotiation",  amount:  380000, prob: 85, close: "2026-06-20", owner: "M. Chen",     forecast: "commit",   region: "APAC", segment: "SMB",         motion: "new" }
+    { account: "Northwind Industries",   stage: "Negotiation",  amount: 2400000, prob: 75, close: "2026-06-28", owner: "S. Rivera",   forecast: "commit",   region: "NA",   segment: "Enterprise",  motion: "new",       nextStep: null },
+    { account: "Contoso Manufacturing",  stage: "Proposal",     amount: 1850000, prob: 60, close: "2026-07-15", owner: "L. Patel",    forecast: "bestcase", region: "EMEA", segment: "Enterprise",  motion: "expansion", nextStep: { action: "Pricing approval",      dueDate: "2026-06-15", daysFromNow:  3 } },
+    { account: "Fabrikam Logistics",     stage: "Discovery",    amount: 1200000, prob: 35, close: "2026-08-10", owner: "M. Chen",     forecast: "upside",   region: "APAC", segment: "Mid-Market",  motion: "new",       nextStep: null },
+    { account: "Adventure Works",        stage: "Negotiation",  amount: 1100000, prob: 80, close: "2026-06-25", owner: "S. Rivera",   forecast: "commit",   region: "NA",   segment: "Enterprise",  motion: "expansion", nextStep: { action: "Mutual close plan",     dueDate: "2026-06-18", daysFromNow:  6 } },
+    { account: "Tailwind Traders",       stage: "Proposal",     amount:  980000, prob: 55, close: "2026-07-08", owner: "J. Okafor",   forecast: "bestcase", region: "NA",   segment: "Enterprise",  motion: "new",       nextStep: { action: "Demo with CTO",         dueDate: "2026-06-17", daysFromNow:  5 } },
+    { account: "Wide World Importers",   stage: "Qualified",    amount:  860000, prob: 25, close: "2026-08-22", owner: "L. Patel",    forecast: "upside",   region: "EMEA", segment: "Mid-Market",  motion: "new",       nextStep: { action: "Champion meeting",      dueDate: "2026-06-14", daysFromNow:  2 } },
+    { account: "Lucerne Publishing",     stage: "Negotiation",  amount:  720000, prob: 70, close: "2026-06-30", owner: "M. Chen",     forecast: "commit",   region: "EMEA", segment: "Mid-Market",  motion: "new",       nextStep: { action: "Legal redline",         dueDate: "2026-06-05", daysFromNow: -7 } },
+    { account: "Litware Inc.",           stage: "Proposal",     amount:  680000, prob: 50, close: "2026-07-20", owner: "K. Yamada",   forecast: "bestcase", region: "APAC", segment: "Enterprise",  motion: "expansion", nextStep: { action: "Security questionnaire", dueDate: "2026-06-16", daysFromNow:  4 } },
+    { account: "Proseware Systems",      stage: "Discovery",    amount:  540000, prob: 30, close: "2026-08-30", owner: "J. Okafor",   forecast: "upside",   region: "NA",   segment: "Mid-Market",  motion: "new",       nextStep: { action: "Procurement review",    dueDate: "2026-06-19", daysFromNow:  7 } },
+    { account: "Margie's Travel",        stage: "Negotiation",  amount:  480000, prob: 65, close: "2026-07-05", owner: "S. Rivera",   forecast: "commit",   region: "NA",   segment: "SMB",         motion: "expansion", nextStep: { action: "Renewal terms",         dueDate: "2026-06-09", daysFromNow: -3 } },
+    { account: "Trey Research",          stage: "Proposal",     amount:  420000, prob: 55, close: "2026-07-18", owner: "L. Patel",    forecast: "bestcase", region: "EMEA", segment: "Mid-Market",  motion: "expansion", nextStep: { action: "Pricing approval",      dueDate: "2026-06-13", daysFromNow:  1 } },
+    { account: "Graphic Design Inst.",   stage: "Negotiation",  amount:  380000, prob: 85, close: "2026-06-20", owner: "M. Chen",     forecast: "commit",   region: "APAC", segment: "SMB",         motion: "new",       nextStep: { action: "Demo with CTO",         dueDate: "2026-06-15", daysFromNow:  3 } }
   ],
+
+  /* nextStep meta — daysFromNow is computed against meta.asOf (Jun 12, 2026) at
+     data-author time so render is trivial; in a real system this would be live. */
 
   /* Rep leaderboard */
   reps: [
@@ -210,6 +213,7 @@ window.SALESPULSE_DATA = {
       "Expansion is 40% of pipeline but ~50% of weighted pipeline (40% win rate vs 22% for new logo) — under-invested high-ROI motion.",
       "Top-3 accounts (Northwind, Contoso, Fabrikam) = ~30% of weighted pipe ($3.3M of $58.7M). If any slips, commit gap to quota widens by that amount — pressure-test these in pipe review.",
       "Pipegen ran below the $13.5M/wk target in 3 of 8 weeks (W1, W3, W7) — outbound is 42% of mix but the misses lined up with inbound-light weeks. Action: review SDR ramp + inbound campaign cadence.",
+      "4 of the top-12 deals are un-defensible heading into Friday call: Northwind + Fabrikam have NO next step logged, Lucerne is 7d overdue on Legal redline, Margie's is 3d overdue on renewal terms — $4.8M weighted in commit. Manager-led pipe review on these before EOD.",
       "Activity score for E. Sokolova (55) is below threshold — coaching candidate.",
       "Recommended action: re-balance territory coverage in EMEA Mid-Market."
     ],
