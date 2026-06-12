@@ -1869,9 +1869,10 @@
     const list = $("insight-list");
     if (!list) return;
     const items = D.insights[insightIdx % D.insights.length].slice();
-    // Prepend a live computed inbox bullet so AI INSIGHTS always reflects the
-    // top action in the current queue — keeps the panel actionable even as
-    // upstream signals shift.
+    try {
+      const li = lensInsightIntro();
+      if (li) items.unshift(li);
+    } catch (e) {}
     try {
       const ib = inboxAiBullet();
       if (ib) items.unshift(ib);
@@ -2463,7 +2464,7 @@
   }
   function runCommand(cmd) {
     if (cmd === "HELP") {
-      flash("CMDS: GO DASH | GO CHG | GO FUNNEL | GO FORECAST | GO DEALS | GO REPS | GO COACH | GO SLIP | GO PIPE | GO COV | GO RISKS | GO AUD | FILTER NA/EMEA/APAC | FCST COMMIT/BEST | MOTION ALL/NEW/EXP | ROTATE");
+      flash("CMDS: GO DASH | GO CHG | GO FUNNEL | GO FORECAST | GO DEALS | GO REPS | GO COACH | GO SLIP | GO PIPE | GO COV | GO RISKS | GO AUD | FILTER NA/EMEA/APAC | FCST COMMIT/BEST | MOTION ALL/NEW/EXP | LENS CRO/MGR/AE/CFO/CMO/BOARD/FULL | ROTATE");
       return;
     }
     const goMap = {
@@ -2493,7 +2494,157 @@
       }
     }
     if (cmd === "ROTATE") { insightIdx = (insightIdx + 1) % D.insights.length; renderInsight(); return; }
+    if (cmd.startsWith("LENS ")) {
+      const p = cmd.slice(5).trim().toLowerCase();
+      if (LENS_MAP[p]) { setLens(p); flash("LENS: " + LENS_LABEL[p].toUpperCase()); return; }
+      flash("UNKNOWN LENS: " + p.toUpperCase() + " — try CRO/MGR/AE/CFO/CMO/BOARD/FULL", "err");
+      return;
+    }
     flash(`UNKNOWN CMD: ${cmd} · type HELP`, "err");
+  }
+
+  /* ---------- LENS PERSONA MODES (#24) ----------
+     Closes §9.2 cognitive-overload heuristic by giving each persona a
+     curated subset of the 17 panels. Implementation hides via CSS class on
+     <main> — DOM stays intact so all computed totals/insights remain in
+     sync; we only flip visibility. Persona-specific side-effects (MY DEALS
+     for AE, YoY basis for BOARD, motion=ALL for CMO) fire only on the
+     persona-CHANGE event so they don't override the user's later choices. */
+  const LS_LENS_KEY = "salespulse.lens";
+  const LENS_LABEL = {
+    cro: "CRO", mgr: "Sales Mgr", ae: "AE", cfo: "CFO",
+    cmo: "CMO", board: "Board", full: "Full"
+  };
+  const LENS_USR_SHORT = {
+    cro: "CRO", mgr: "MGR", ae: "AE", cfo: "CFO",
+    cmo: "CMO", board: "BOARD", full: "VP SALES"
+  };
+  // Each value = the set of panel IDs visible for that persona. "full" = null
+  // means everything visible (no hide rules emitted).
+  const LENS_MAP = {
+    cro:   new Set(["inbox","dashboard","forecast","changed","yoy","forward-cov","at-risk-reps","slippage","insights","audience","release"]),
+    mgr:   new Set(["inbox","dashboard","funnel","deals","reps","at-risk-reps","slippage","changed","insights","release"]),
+    ae:    new Set(["inbox","dashboard","deals","insights","release"]),
+    cfo:   new Set(["dashboard","forecast","yoy","slippage","release"]),
+    cmo:   new Set(["dashboard","pipegen","funnel","segments","insights","release"]),
+    board: new Set(["dashboard","forecast","yoy","insights","release"]),
+    full:  null
+  };
+  const ALL_PANEL_IDS = [
+    "inbox","changed","yoy","dashboard","funnel","forecast","deals","slippage",
+    "pipegen","forward-cov","at-risk-reps","reps","segments","risks","insights","audience","release"
+  ];
+  const LENS_SHORTCUT_ORDER = ["cro","mgr","ae","cfo","cmo","board","full"];
+  const LENS_INSIGHT_INTRO = {
+    cro:   "EXECUTIVE LENS: focus is on Q-end commit, slippage, YoY narrative, and rep risk — pipeline-creation panels hidden.",
+    mgr:   "MANAGER LENS: focus is on deal/rep ops — exec narrative & pipegen panels hidden.",
+    ae:    "AE LENS: MY DEALS auto-enabled — your individual quota, deals, and momentum only. Rep leaderboard hidden.",
+    cfo:   "CFO LENS: money-only view — KPIs, FORECAST, projection, YoY, slippage. Funnel/segments hidden.",
+    cmo:   "CMO LENS: demand-gen view — PIPELINE CREATED expanded, motion lens reset to ALL. Forecast/deals hidden.",
+    board: "BOARD LENS: quarterly narrative — WHAT CHANGED flipped to YoY basis. Rep-level detail hidden."
+  };
+
+  let currentLens = (function () {
+    try {
+      const v = localStorage.getItem(LS_LENS_KEY);
+      return v && LENS_MAP.hasOwnProperty(v) ? v : "full";
+    } catch (e) { return "full"; }
+  })();
+
+  function applyLens() {
+    const main = $("main");
+    if (!main) return;
+    // Reset all lens classes, set the active one.
+    Object.keys(LENS_MAP).forEach((k) => main.classList.remove("lens-" + k));
+    main.classList.add("lens-" + currentLens);
+
+    // Update pill states.
+    document.querySelectorAll("#lens-pills .lens-pill").forEach((b) => {
+      const a = b.dataset.lens === currentLens;
+      b.classList.toggle("active", a);
+      b.setAttribute("aria-pressed", a ? "true" : "false");
+    });
+
+    // Update preview chip.
+    const chip = $("lens-chip");
+    if (chip) {
+      if (currentLens === "full") {
+        chip.hidden = true; chip.innerHTML = "";
+      } else {
+        const visible = LENS_MAP[currentLens].size;
+        chip.hidden = false;
+        chip.innerHTML =
+          `<span class="lens-chip-lbl">LENS:</span> ` +
+          `<b>${esc(LENS_LABEL[currentLens].toUpperCase())}</b> ` +
+          `<span class="muted">· ${visible}/${ALL_PANEL_IDS.length} PANELS VISIBLE ·</span> ` +
+          `<button type="button" class="lens-clear" id="lens-clear" title="Clear lens (return to FULL)">✕ CLEAR</button>`;
+        const cb = $("lens-clear");
+        if (cb) cb.addEventListener("click", () => setLens("full"));
+      }
+    }
+
+    // Update status-bar USR segment.
+    setText("status-usr-val", LENS_USR_SHORT[currentLens] || "VP SALES");
+
+    // Update USR ticker entry.
+    if (D.ticker && Array.isArray(D.ticker)) {
+      const t = D.ticker.find((x) => x.sym === "USR");
+      if (t) {
+        t.val = (LENS_LABEL[currentLens] || "FULL").toUpperCase();
+        t.chg = currentLens === "full" ? "+FULL DASHBOARD" : "+SCOPED VIEW";
+        try { renderTicker(); } catch (e) {}
+      }
+    }
+  }
+  // Persona-specific side-effects (fire only on lens CHANGE — not on initial
+  // load, so we don't override the user's later choices within a persona).
+  function applyLensSideEffects(prev, next) {
+    if (prev === next) return;
+    try {
+      if (next === "ae") {
+        try { localStorage.setItem("salespulse.dealsMine", "1"); } catch (e) {}
+        const toggle = $("deal-mine");
+        if (toggle && typeof bindMyDeals === "function" && !toggle.classList.contains("active")) {
+          toggle.click();
+        }
+      }
+      if (next === "board") {
+        try { localStorage.setItem("salespulse.changedBasis", "yoy"); } catch (e) {}
+        if (typeof applyChangedBasis === "function") applyChangedBasis();
+      }
+      if (next === "cmo") {
+        if (typeof setMotion === "function") setMotion("all");
+      }
+    } catch (e) { /* non-fatal */ }
+  }
+  function setLens(p) {
+    if (!LENS_MAP.hasOwnProperty(p)) return;
+    const prev = currentLens;
+    currentLens = p;
+    try { localStorage.setItem(LS_LENS_KEY, p); } catch (e) {}
+    applyLensSideEffects(prev, p);
+    applyLens();
+    // Re-render insight so the lens-specific intro bullet updates.
+    try { renderInsight(); } catch (e) {}
+  }
+  function bindLensPills() {
+    document.querySelectorAll("#lens-pills .lens-pill").forEach((btn) => {
+      btn.addEventListener("click", () => setLens(btn.dataset.lens));
+    });
+  }
+  function bindLensShortcuts() {
+    document.addEventListener("keydown", (e) => {
+      if (!e.shiftKey) return;
+      const idx = ["F1","F2","F3","F4","F5","F6","F7"].indexOf(e.key);
+      if (idx === -1) return;
+      e.preventDefault();
+      setLens(LENS_SHORTCUT_ORDER[idx]);
+      flash("LENS: " + LENS_LABEL[LENS_SHORTCUT_ORDER[idx]].toUpperCase());
+    });
+  }
+  function lensInsightIntro() {
+    if (currentLens === "full") return null;
+    return LENS_INSIGHT_INTRO[currentLens] || null;
   }
 
   /* ---------- TOAST ---------- */
@@ -2546,6 +2697,9 @@
     renderForwardCoverage();
     renderInbox();
     bindInboxFilters();
+    applyLens();
+    bindLensPills();
+    bindLensShortcuts();
     renderInsight();
     bindRegen();
     bindCommand();

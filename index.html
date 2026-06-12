@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>SALESPULSE LIVE · TERMINAL</title>
   <meta name="description" content="SalesPulse Live — Bloomberg-style sales pipeline command center for VPs of Sales, RevOps, and AEs. Synthetic data only." />
-  <link rel="stylesheet" href="styles.css?v=0.18.0" />
+  <link rel="stylesheet" href="styles.css?v=0.19.0" />
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to main content</a>
@@ -21,6 +21,17 @@
       <span class="dot" aria-hidden="true"></span>
       <span>SALESPULSE&nbsp;LIVE</span>
       <span class="sub">B2B SAAS PIPELINE COMMAND CENTER · Q2 FY26</span>
+    </div>
+    <!-- LENS persona modes (#24) — re-scope the dashboard for the seat in the chair -->
+    <div class="lens-pills" id="lens-pills" role="group" aria-label="Persona lens (Shift+F1-F7 to cycle)">
+      <span class="lens-lbl">LENS</span>
+      <button type="button" class="lens-pill" data-lens="cro"   aria-pressed="false" title="Shift+F1 — CRO / VP-Sales view">CRO</button>
+      <button type="button" class="lens-pill" data-lens="mgr"   aria-pressed="false" title="Shift+F2 — Sales Manager view">MGR</button>
+      <button type="button" class="lens-pill" data-lens="ae"    aria-pressed="false" title="Shift+F3 — Account Executive view">AE</button>
+      <button type="button" class="lens-pill" data-lens="cfo"   aria-pressed="false" title="Shift+F4 — CFO view">CFO</button>
+      <button type="button" class="lens-pill" data-lens="cmo"   aria-pressed="false" title="Shift+F5 — CMO view">CMO</button>
+      <button type="button" class="lens-pill" data-lens="board" aria-pressed="false" title="Shift+F6 — Board view">BOARD</button>
+      <button type="button" class="lens-pill active" data-lens="full" aria-pressed="true" title="Shift+F7 — Full dashboard">FULL</button>
     </div>
     <div class="clock"><span class="lbl">SYS</span><span id="clock">--:--:--</span></div>
   </div>
@@ -67,6 +78,9 @@
         <button class="motion-seg"        type="button" role="tab" data-motion="expansion" aria-selected="false">EXPANSION</button>
       </div>
     </section>
+
+    <!-- LENS preview chip (#24) — visible when non-FULL persona active -->
+    <div id="lens-chip" class="lens-chip" hidden></div>
 
     <!-- ACTION INBOX (#23) — consolidated/deduped/ranked queue of every red/amber across the dashboard.
          Placed directly under the hero strip per spec — second thing a CRO sees after the headline gap. -->
@@ -443,6 +457,7 @@
       </div>
       <div class="panel-body">
         <ul class="rel-list">
+          <li><span class="ver">v0.19</span> <b>LENS persona modes — re-scope the dashboard for the seat in the chair</b> — closes the §9.2 cognitive-overload heuristic by letting each role see only the panels that map to their job-to-be-done. New top-bar pill group <b>LENS: [CRO][MGR][AE][CFO][CMO][BOARD][FULL]</b> (default FULL = full dashboard, unchanged from prior versions). Per-persona panel maps (CSS-only hide via <i>main.lens-cro section#X { display: none }</i> — DOM stays intact, so KPIs/totals/insights remain in sync; only visibility changes). <b>CRO</b> sees the executive close-set (INBOX, hero, KPIs, FORECAST, WHAT CHANGED, YoY, FORWARD COVERAGE, at-risk reps, top-3 concentration, slippage, AI insights). <b>MGR</b> sees deal/rep ops (INBOX, KPIs, FUNNEL, TOP DEALS, REPS, AT-RISK REPS, slippage, WHAT CHANGED). <b>AE</b> sees individual-rep view (INBOX, KPIs scoped to MY DEALS — toggle auto-on, TOP DEALS, momentum heatmap, AI insights) — also flips <i>salespulse.dealsMine = true</i> on persona switch. <b>CFO</b> sees the money-only set (KPIs, FORECAST, projection, YoY, slippage). <b>CMO</b> sees demand-gen (KPIs, PIPELINE CREATED, FUNNEL, segments/regions) — auto-sets motion lens to ALL + pre-expands pipegen. <b>BOARD</b> sees the quarterly-narrative subset (hero, headline KPIs, FORECAST, YoY) — auto-flips WHAT CHANGED basis to YoY on persona switch. Persisted in <i>localStorage.salespulse.lens</i>. <b>Shift+F1-F7</b> shortcuts cycle personas (CRO/MGR/AE/CFO/CMO/BOARD/FULL). Status-bar USR segment now reflects the active lens. A floating preview chip <i>LENS: CRO · 10/18 PANELS VISIBLE · [✕ CLEAR]</i> appears above the inbox when non-FULL. AI INSIGHTS prepends a lens-specific intro bullet when non-FULL. <i>@media (prefers-reduced-motion)</i> respected — no fade if user opted out. On mobile the pill group collapses to a single dropdown. New <b>LENS &lt;persona&gt;</b> command (e.g. <i>LENS CRO</i>, <i>LENS FULL</i>). New <b>USR</b> ticker reflecting the live lens. Together with #23 ACTION INBOX (v0.18) and #10 WHAT CHANGED (v0.6), LENS completes the §9 cognitive-load mitigation triad · closes #24</li>
           <li><span class="ver">v0.18</span> <b>ACTION INBOX — consolidated, deduped, ranked queue of every red+amber across the dashboard</b> — single answer to <i>"what do I do right now?"</i> across every persona. New panel directly under the hero strip aggregates alerts from <b>9 sources</b>: slippage (#8), missing/overdue next-step (#15), cold momentum (#14), weak-commit MEDDIC (#20), at-risk reps (#21), negative WoW prob moves (#10), forward coverage gaps (#16), top-3 concentration (#11), and over-committers in commit (#19). Same-account items <i>dedupe into one row</i> (severity = max of merged, title concatenates issues, amount = max deal amount). Sort: severity desc → amount desc → category alpha. Top 12 visible; rest collapse under a <i>+ N MORE</i> expander. Each row shows a severity dot (●), category chip (8 chars), title (~80 char truncate with full text on hover), $$ at risk, and a tone-colored suggested-action chip (<b>PIPE REVIEW · 1:1 COACH · DEAL INSPECT · PIPE GEN · FORECAST RECAL · COMPETE PLAY</b>). Clicking a row jumps to the source row/panel and triggers the standard 1.5s highlight pulse. Panel-head micro-stat: <i>N ACTIONS · $X.XM AT RISK · N●HIGH · N●MED · N●LOW</i>. Filter chips in header: <b>ALL · HIGH ONLY · BY ACCOUNT · BY REP</b> (persisted in <i>localStorage.salespulse.inboxView</i>; the BY-* views re-group same items into account/rep buckets without removing any). Empty state celebrates: <i>ALL CLEAR — NO ACTIONS PENDING · Friday looks easy. Go close something.</i> Status bar gets a new clickable <b>INBOX N●</b> segment color-toned by highest queue severity — click jumps to the panel. New <b>INBOX</b> ticker (count + $$ at risk). New AI insight bullet computed from the actual inbox contents — names the top account with the most overlapping alerts and quantifies the single-meeting fix. Partially mitigates §9.2 cognitive overload by giving every persona a single landing target before they fan out across 17 panels · closes #23</li>
           <li><span class="ver">v0.17</span> <b>YoY SAME-QUARTER COMPARE — completes the temporal matrix</b> — adds the dimension every board-deck and CFO conversation needs but the dashboard didn't render. New compact 4-column panel (KPI · THIS Q · SAME Q LAST YR · YoY Δ) sits between WHAT CHANGED and KPI DESK, comparing 8 KPIs at the same week-of-quarter (Jun 12 2026 vs Jun 13 2025): Pipeline Value, Weighted Pipeline, Win Rate, Avg Deal Size, Sales Cycle, Coverage, Commit @ W8/13, and Slippage. Story: <b>7 of 8 UP YoY</b> (pipeline +17.8% · weighted +21.8% · commit +21% · cycle −7d) with <i>slippage +45.1%</i> as the lone regression — the friction-tax dimension that explains why a strong top-line doesn't feel strong at the Friday call. Panel-head summary stat: <i>N UP · M DOWN · BEST · WORST</i>. THIS Q reconciles automatically with the existing KPI DESK; a <i>⚠ MISMATCH</i> chip appears if drift is detected (reuses #16 pattern). Each KPI tile gains a second <i>vs Jun 2025</i> whisper line under the #10 WoW whisper — so an AE/CRO sees temporal context at three depths (week / year / projection) in the same tile. HERO STRIP appends <i>· commit +21% YoY</i>. WHAT CHANGED panel gets a <b>WoW | YoY</b> toggle in the header — flipping to YoY re-renders the commit-movement card against the year-ago basis instead of the week-ago snapshot; persisted in <i>localStorage.salespulse.changedBasis</i>. New <b>YOY</b> ticker (<i>+17.8% PIPE vs Q2 FY25</i>) + AI insight bullet quantifies which 7 are up and why slippage is the one to fix · contributes to #3 (broader vs-what labeling remains open) · closes #22</li>
           <li><span class="ver">v0.16</span> <b>QUAL column on TOP OPEN DEALS — MEDDIC 0-8 score + weak-commit alarm</b> — completes the daily-use trinity (momentum + next-step + qual) on the most-trafficked panel. New sortable <b>QUAL</b> column between MOMENTUM and CLOSE renders a tone-colored <i>X/8</i> score (green ≥ 6 · amber 4-5 · red ≤ 3) + an 8-cell segmented bar in MEDDPICC order (M·E·D·D·I·C·P·C) so an AE can see at a glance <i>which</i> letters are missing without opening the deal. Hover the bar to list the missed checks by name. Panel-head micro-stat: <b>QUAL HEALTH: X.X/8 AVG · N WEAK-COMMIT DEALS</b> where weak = <i>prob ≥ 70 AND qual &lt; 5/8</i> — clickable to filter the table to just those deals (persisted in localStorage). TOP-3 CONCENTRATION tooltip now appends top-3 avg qual. PROJECTED Q-END methodology tooltip notes that qual &lt; 5/8 deals historically land 35% less often than qual ≥ 6/8 — so the projection range should be read with that lens. New AI insight bullet names Northwind ($2.4M, 4/8) as the single largest commit-defensibility gap in the book. Mobile (≤480px): column collapses to numeric only, tap reveals the bar · closes #20</li>
@@ -469,7 +484,7 @@
   <!-- STATUS BAR -->
   <div class="status-bar">
     <span class="seg"><span class="l">ENV</span> DEMO</span>
-    <span class="seg"><span class="l">USR</span> VP SALES</span>
+    <span class="seg" id="status-usr"><span class="l">USR</span> <span id="status-usr-val">VP SALES</span></span>
     <span class="seg clickable" id="status-inbox" role="button" tabindex="0" title="Jump to ACTION INBOX"><span class="l">INBOX</span> <span id="status-inbox-val">—</span></span>
     <span class="seg"><span class="l">PER</span> Q2 FY26</span>
     <span class="seg"><span class="l">CCY</span> USD</span>
@@ -477,7 +492,7 @@
     <span class="seg right"><span class="l">SYS</span> <span id="clock2">--:--:--</span></span>
   </div>
 
-  <script src="data.js?v=0.18.0"></script>
-  <script src="app.js?v=0.18.0"></script>
+  <script src="data.js?v=0.19.0"></script>
+  <script src="app.js?v=0.19.0"></script>
 </body>
 </html>

@@ -1286,3 +1286,174 @@ select option { background: var(--bg); color: var(--white); }
   .inbox-amt   { grid-row: 2; grid-column: 2 / span 2; text-align: left; font-size: 11px; }
   .inbox-act   { grid-row: 2; grid-column: 4; font-size: 9px; padding: 2px 4px; }
 }
+
+
+/* ===== LENS persona modes (#24) — re-scope panels per role ===== */
+.terminal-bar .lens-pills {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0 14px;
+  font-family: var(--mono);
+}
+.terminal-bar .lens-pills .lens-lbl {
+  color: var(--dim);
+  font-size: 10.5px;
+  letter-spacing: 0.6px;
+  margin-right: 4px;
+}
+.terminal-bar .lens-pills .lens-pill {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.6px;
+  padding: 3px 8px;
+  background: transparent;
+  color: var(--dim);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  cursor: pointer;
+  font-weight: 700;
+  transition: color 120ms, border-color 120ms, background 120ms;
+}
+.terminal-bar .lens-pills .lens-pill:hover {
+  color: var(--green);
+  border-color: var(--green-dim);
+}
+.terminal-bar .lens-pills .lens-pill.active {
+  color: var(--bg);
+  background: var(--green);
+  border-color: var(--green);
+}
+.terminal-bar .lens-pills .lens-pill:focus {
+  outline: 1px solid var(--green);
+  outline-offset: 1px;
+}
+
+/* Lens preview chip — visible above the inbox when a non-FULL persona is active */
+.lens-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.5px;
+  color: var(--white);
+  background: var(--bg-1);
+  border: 1px solid var(--green-dim);
+  padding: 6px 10px;
+  margin: 0 0 8px;
+  border-radius: 2px;
+}
+.lens-chip b { color: var(--green); }
+.lens-chip .muted { color: var(--dim); font-weight: 400; }
+.lens-chip .lens-chip-lbl { color: var(--dim); }
+.lens-chip .lens-clear {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.5px;
+  padding: 2px 6px;
+  background: transparent;
+  color: var(--red);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  cursor: pointer;
+  margin-left: auto;
+  font-weight: 700;
+}
+.lens-chip .lens-clear:hover { border-color: var(--red); }
+.lens-chip .lens-clear:focus { outline: 1px solid var(--red); outline-offset: 1px; }
+
+/* Per-persona panel-hide rules — DOM stays intact, so all computed totals/insights stay in sync */
+
+main.lens-cro section#funnel,
+  main.lens-cro section#deals,
+  main.lens-cro section#pipegen,
+  main.lens-cro section#reps,
+  main.lens-cro section#segments,
+  main.lens-cro section#risks { display: none !important; }
+
+main.lens-mgr section#yoy,
+  main.lens-mgr section#forecast,
+  main.lens-mgr section#pipegen,
+  main.lens-mgr section#forward-cov,
+  main.lens-mgr section#segments,
+  main.lens-mgr section#risks,
+  main.lens-mgr section#audience { display: none !important; }
+
+main.lens-ae section#changed,
+  main.lens-ae section#yoy,
+  main.lens-ae section#funnel,
+  main.lens-ae section#forecast,
+  main.lens-ae section#slippage,
+  main.lens-ae section#pipegen,
+  main.lens-ae section#forward-cov,
+  main.lens-ae section#at-risk-reps,
+  main.lens-ae section#reps,
+  main.lens-ae section#segments,
+  main.lens-ae section#risks,
+  main.lens-ae section#audience { display: none !important; }
+
+main.lens-cfo section#inbox,
+  main.lens-cfo section#changed,
+  main.lens-cfo section#funnel,
+  main.lens-cfo section#deals,
+  main.lens-cfo section#pipegen,
+  main.lens-cfo section#forward-cov,
+  main.lens-cfo section#at-risk-reps,
+  main.lens-cfo section#reps,
+  main.lens-cfo section#segments,
+  main.lens-cfo section#risks,
+  main.lens-cfo section#insights,
+  main.lens-cfo section#audience { display: none !important; }
+
+main.lens-cmo section#inbox,
+  main.lens-cmo section#changed,
+  main.lens-cmo section#yoy,
+  main.lens-cmo section#forecast,
+  main.lens-cmo section#deals,
+  main.lens-cmo section#slippage,
+  main.lens-cmo section#forward-cov,
+  main.lens-cmo section#at-risk-reps,
+  main.lens-cmo section#reps,
+  main.lens-cmo section#risks,
+  main.lens-cmo section#audience { display: none !important; }
+
+main.lens-board section#inbox,
+  main.lens-board section#changed,
+  main.lens-board section#funnel,
+  main.lens-board section#deals,
+  main.lens-board section#slippage,
+  main.lens-board section#pipegen,
+  main.lens-board section#forward-cov,
+  main.lens-board section#at-risk-reps,
+  main.lens-board section#reps,
+  main.lens-board section#segments,
+  main.lens-board section#risks,
+  main.lens-board section#audience { display: none !important; }
+
+
+/* Mobile: collapse lens pill group to a horizontal scroll strip; keep pills tappable */
+@media (max-width: 720px) {
+  .terminal-bar .lens-pills {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    max-width: 100%;
+    margin: 4px 0 0;
+    padding: 0 4px;
+    -webkit-overflow-scrolling: touch;
+  }
+  .terminal-bar .lens-pills .lens-pill {
+    flex: 0 0 auto;
+    min-width: 44px;
+    padding: 4px 6px;
+    font-size: 10px;
+  }
+  .lens-chip { font-size: 10.5px; padding: 5px 8px; flex-wrap: wrap; }
+}
+
+/* Respect user motion preferences — no fades when reduced motion is requested */
+@media (prefers-reduced-motion: reduce) {
+  .terminal-bar .lens-pills .lens-pill,
+  .lens-chip,
+  #lens-chip { transition: none; }
+}

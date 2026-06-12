@@ -324,6 +324,7 @@ window.SALESPULSE_DATA = {
     { sym: "QUAL",     val: "4.8/8",   chg: "▼ 1 WEAK COMMIT" },
     { sym: "YOY",      val: "+17.8%",  chg: "PIPE vs Q2 FY25" },
     { sym: "INBOX",    val: "—",       chg: "ACTION QUEUE" },
+    { sym: "USR",      val: "FULL",    chg: "LENS PERSONA" },
     { sym: "RIVERA",   val: "102%",    chg: "+2%" },
     { sym: "PATEL",    val: "88%",     chg: "+5%" },
     { sym: "CHEN",     val: "76%",     chg: "+3%" },
