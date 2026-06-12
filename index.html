@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>SALESPULSE LIVE · TERMINAL</title>
   <meta name="description" content="SalesPulse Live — Bloomberg-style sales pipeline command center for VPs of Sales, RevOps, and AEs. Synthetic data only." />
-  <link rel="stylesheet" href="styles.css?v=0.12.0" />
+  <link rel="stylesheet" href="styles.css?v=0.13.0" />
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to main content</a>
@@ -239,6 +239,27 @@
       </div>
     </section>
 
+    <!-- NEXT-QUARTER COVERAGE (#16) — Q2/Q3/Q4 coverage ratios + pipegen gap -->
+    <section id="forward-cov" class="panel" aria-labelledby="fcov-title">
+      <div class="panel-head">
+        <span class="title" id="fcov-title">NEXT-QUARTER COVERAGE</span>
+        <span class="sub">Q2 · Q3 · Q4 · COVERAGE vs 3.0x TARGET</span>
+        <span class="right muted" id="fcov-stamp" style="font-size:10px;">Open pipe by close-date quarter</span>
+      </div>
+      <div class="panel-body tight">
+        <div class="fc-grid" id="fc-grid" aria-live="polite"></div>
+        <div class="fc-bar-wrap" aria-label="Unweighted pipeline by quarter vs 3x target">
+          <svg class="fc-svg" id="fc-svg" viewBox="0 0 600 110" preserveAspectRatio="none" role="img"></svg>
+        </div>
+        <div class="fc-legend">
+          <span><span class="swatch" style="background:var(--green)"></span>Unweighted pipe</span>
+          <span><span class="swatch swatch-fc-target"></span>3.0x coverage target</span>
+          <span><span class="swatch swatch-fc-w"></span>Weighted (probability-adjusted)</span>
+        </div>
+        <div class="fc-caption" id="fc-caption"></div>
+      </div>
+    </section>
+
     <!-- REPS + SEGMENTS row -->
     <div class="row-grid cols-2">
       <section id="reps" class="panel" aria-labelledby="reps-title">
@@ -354,6 +375,7 @@
       </div>
       <div class="panel-body">
         <ul class="rel-list">
+          <li><span class="ver">v0.13</span> <b>NEXT-QUARTER COVERAGE panel</b> — surfaces the board+CFO conversation that's invisible today. New 3-column panel renders open pipe by close-date quarter for Q2 (current) / Q3 / Q4: big tone-colored coverage ratio (green ≥ 3x · amber 0.7–1.0× · red < 0.7×) vs the 3.0x target, weighted/unweighted/deal-count secondaries, and a <i>NEED $XM MORE PIPE TO HIT 3x</i> action row computed at render. Shared horizontal-bar viz beneath the columns shows unweighted-pipe-to-target visually, with a dashed 3x marker. Q2 reconciles exactly with existing Weighted Pipeline + Coverage KPIs — renders a <i>⚠ MISMATCH</i> warning if they drift. New <b>Q3COV / Q4COV</b> ticker symbols + AI insight bullet cross-references the PIPELINE CREATED panel. <b>GO COV / GO COVERAGE</b> commands. Story this quarter: <i>Q3 is 2.0x — alarm bell · need $61.6M more unweighted in 18 weeks</i> · closes #16</li>
           <li><span class="ver">v0.12</span> <b>FORECAST vs QUOTA: W9-W13 dashed projection + PROJECTED Q-END mini-stat</b> — answers the Friday CRO question ("what will we land at?") in one glance. Chart now spans the full quarter; W1-W8 actuals stay solid, W9-W13 renders as a dashed continuation with a translucent extended confidence band and a "NOW" marker at the W8 boundary. New PROJECTED Q-END stat block beside the existing stats: big tone-colored projection $$, range (±7% TTM accuracy), gap vs quota, and "BEST CASE →" sub-stat — methodology tooltip explains the transparent formula (commit + (bestcase−commit) × 40% − slippage drag at 30% recurrence). Hero strip rewrites every render to incorporate the projection. New PROJ ticker symbol + AI insight bullet ties the projection to a recommended Wednesday action · closes #17</li>
           <li><span class="ver">v0.11</span> <b>TOP OPEN DEALS: per-deal MOMENTUM column + heatmap ribbon</b> — surfaces ghosting deals before they slip. New MOMENTUM column between PROB and CLOSE shows a dot (green / amber / red by score), a 0–100 score, and a ▲/─/▼ trend arrow vs prior week. Hover any cell for the underlying touchpoints, last-touch days, and single/multi-thread tooltip (§9.7 trust). Sortable column. A 12-cell heatmap ribbon above the table is sorted by amount: scan momentum vs deal-size at a glance, click any cell to scroll + pulse that row in the table (§9.5 action). Story this quarter: 4 of the top-12 are trending DOWN (Northwind / Fabrikam / Lucerne / Litware — combined $3.1M weighted) and the new AI insight bullet ties the count to the recommended manager-led pipe review · closes #14</li>
           <li><span class="ver">v0.10</span> <b>TOP OPEN DEALS: NEXT STEP column + health rollup</b> — the #1 Monday pipe-review question ("which deals don't have a defined next step?") answered inline. New column between CLOSE and OWNER renders the next step action + a chip for due-in-N-days (green ✓), N-days OVERDUE (red ◀), or bold <b>MISSING</b> for deals with no logged next step. Panel-head <b>NEXT-STEP HEALTH</b> stat shows ✓ on track · ● due soon · ✗ overdue/missing — click the ✗ count to filter the table down to just the un-defensible commit deals in one click (persisted via localStorage). Sortable column header (missing → overdue → due-soon → on-track). TOP-3 CONCENTRATION tile tooltip now also flags top-3 deals missing a next step. New AI insight bullet ties the count + $$ to a recommended action · closes #15</li>
@@ -381,7 +403,7 @@
     <span class="seg right"><span class="l">SYS</span> <span id="clock2">--:--:--</span></span>
   </div>
 
-  <script src="data.js?v=0.12.0"></script>
-  <script src="app.js?v=0.12.0"></script>
+  <script src="data.js?v=0.13.0"></script>
+  <script src="app.js?v=0.13.0"></script>
 </body>
 </html>

@@ -203,6 +203,24 @@ window.SALESPULSE_DATA = {
     ]
   },
 
+  /* NEXT-QUARTER COVERAGE (#16) — forward-looking pipeline by close-date quarter.
+     Story (intentional): Q2 reconciles with existing KPIs (3.1x healthy). Q3 is
+     UNDER-COVERED at 2.0x — alarm bell for board/CFO conversation. Q4 is very
+     thin (1.0x) — too early but flags SDR pipeline build now.
+     pipelineGenNeeded = (quotaQ × coverageTarget − unweighted) — the leveraged
+     number a CRO uses to brief the CMO/SDR org. Q2 numbers reconcile exactly
+     with the existing Weighted Pipeline KPI (58.7) and Coverage KPI (3.1x). */
+  forwardCoverage: {
+    quotas: { Q2: 60.0, Q3: 62.0, Q4: 65.0 },
+    quarters: [
+      { label: "Q2 FY26",   short: "Q2", isCurrent: true,  weighted: 58.7, unweighted: 184.2, dealCount: 138, weeksRemaining:  5, coverage: 3.1 },
+      { label: "Q3 FY26",   short: "Q3", isCurrent: false, weighted: 41.2, unweighted: 124.4, dealCount:  92, weeksRemaining: 18, coverage: 2.0 },
+      { label: "Q4 FY26",   short: "Q4", isCurrent: false, weighted: 18.6, unweighted:  62.8, dealCount:  41, weeksRemaining: 31, coverage: 1.0 }
+    ],
+    coverageTarget: 3.0,
+    pipelineGenNeeded: { Q3: 61.6, Q4: 132.2 }   // (quotaQ × 3) − unweighted
+  },
+
   /* AI insights — 3 rotating sets */
   insights: [
     [
@@ -219,6 +237,7 @@ window.SALESPULSE_DATA = {
       "Expansion is 40% of pipeline but ~50% of weighted pipeline (40% win rate vs 22% for new logo) — under-invested high-ROI motion.",
       "Top-3 accounts (Northwind, Contoso, Fabrikam) = ~30% of weighted pipe ($3.3M of $58.7M). If any slips, commit gap to quota widens by that amount — pressure-test these in pipe review.",
       "Pipegen ran below the $13.5M/wk target in 3 of 8 weeks (W1, W3, W7) — outbound is 42% of mix but the misses lined up with inbound-light weeks. Action: review SDR ramp + inbound campaign cadence.",
+      "Q3 coverage is 2.0x vs the 3.0x target — $61.6M of unweighted pipe short with 18 weeks to Q3 start. At the current $13.5M/wk pipegen run-rate from #12 that's a 4.5-week sprint of perfect pipegen — feasible but unforgiving. Action: brief CMO + SDR leadership this week on outbound + inbound campaign acceleration; cross-reference PIPELINE CREATED panel.",
       "4 of the top-12 deals are un-defensible heading into Friday call: Northwind + Fabrikam have NO next step logged, Lucerne is 7d overdue on Legal redline, Margie's is 3d overdue on renewal terms — $4.8M weighted in commit. Manager-led pipe review on these before EOD.",
       "Momentum is DOWN on 4 of the top-12 deals (Northwind, Fabrikam, Lucerne, Litware) — combined $3.1M weighted. Prob and close date haven't moved yet, but engagement has — these are the deals most likely to slip next. Assign manager-led pipe reviews this week.",
       "Activity score for E. Sokolova (55) is below threshold — coaching candidate.",
@@ -264,6 +283,8 @@ window.SALESPULSE_DATA = {
     { sym: "Q2BEST",   val: "69.8M",   chg: "+9.8M" },
     { sym: "PROJ",     val: "59.2M",   chg: "±$4.1M Q-END" },
     { sym: "PIPEGEN",  val: "17.1M",   chg: "+8.6M NET" },
+    { sym: "Q3COV",    val: "2.0x",    chg: "▼ under-covered" },
+    { sym: "Q4COV",    val: "1.0x",    chg: "▼ thin" },
     { sym: "RIVERA",   val: "102%",    chg: "+2%" },
     { sym: "PATEL",    val: "88%",     chg: "+5%" },
     { sym: "CHEN",     val: "76%",     chg: "+3%" },

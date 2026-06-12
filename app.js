@@ -983,6 +983,131 @@
     }
   }
 
+  /* ---------- NEXT-QUARTER COVERAGE (#16) ----------
+     Renders open pipe by close-date quarter for Q2/Q3/Q4. Each column
+     shows the coverage ratio (tone-colored vs 3.0x target), weighted +
+     unweighted + deal count, weeks remaining in/to the quarter, and a
+     pipegen-needed action row when coverage < target. A shared horizontal
+     bar viz below the columns visualizes unweighted pipe vs the 3.0x
+     target ($M scale shared across the 3 quarters). Q2 reconciles with
+     the existing Weighted Pipeline KPI (58.7) and Coverage KPI (3.1x) —
+     renders ⚠ MISMATCH if they drift. */
+  function renderForwardCoverage() {
+    const fc = D.forwardCoverage;
+    const grid = $("fc-grid");
+    const svg  = $("fc-svg");
+    const cap  = $("fc-caption");
+    if (!fc || !grid || !svg) return;
+
+    const target = fc.coverageTarget || 3.0;
+
+    // Reconciliation guard for Q2 vs existing KPIs (#16 acceptance criterion).
+    let mismatch = "";
+    try {
+      const q2 = fc.quarters.find(q => q.isCurrent);
+      const wpipeKpi = (D.kpis || []).find(k => /weighted/i.test(k.label || ""));
+      const covKpi   = (D.kpis || []).find(k => /coverage/i.test(k.label || ""));
+      const wpipeVal = wpipeKpi ? parseFloat(String(wpipeKpi.value).replace(/[^0-9.]/g, "")) : null;
+      const covVal   = covKpi   ? parseFloat(String(covKpi.value).replace(/[^0-9.]/g, ""))   : null;
+      if (q2 && wpipeVal != null && Math.abs(q2.weighted - wpipeVal) > 0.2) mismatch = "weighted";
+      if (q2 && covVal   != null && Math.abs(q2.coverage - covVal)  > 0.2)  mismatch = mismatch ? "both" : "coverage";
+    } catch (e) { /* ignore */ }
+
+    function toneFor(cov) {
+      if (cov >= target) return "green";
+      if (cov >= target * 0.7) return "amber";
+      return "red";
+    }
+    function gapFor(q) {
+      // unweighted dollars needed to hit 3.0x for this quarter's quota
+      const quota = fc.quotas[q.short] || 0;
+      const need  = quota * target - q.unweighted;
+      return need;
+    }
+
+    grid.innerHTML = fc.quarters.map(q => {
+      const tone = toneFor(q.coverage);
+      const quota = fc.quotas[q.short] || 0;
+      const wkLabel = q.isCurrent
+        ? `WK ${(D.meta && D.meta.weekNow) || "?"} OF ${(D.meta && D.meta.weeksTotal) || "?"}`
+        : `${q.weeksRemaining} WK TO START`;
+      const need = gapFor(q);
+      const showAction = !q.isCurrent && q.coverage < target;
+      const actionTone = need > quota * target * 0.5 ? "red" : "amber";
+      const mmFlag = q.isCurrent && mismatch
+        ? `<div class="fc-mismatch" title="Q2 row does not reconcile with existing ${mismatch === "both" ? "Weighted Pipeline + Coverage" : (mismatch === "weighted" ? "Weighted Pipeline" : "Coverage")} KPI — data drift">⚠ MISMATCH vs KPI</div>`
+        : "";
+      return `
+        <div class="fc-col ${q.isCurrent ? "is-current" : ""}">
+          <div class="fc-col-head">
+            <span class="fc-label">${esc(q.label)}${q.isCurrent ? " <span class='fc-cur'>(CURRENT)</span>" : ""}</span>
+            <span class="fc-wk muted">${wkLabel}</span>
+          </div>
+          <div class="fc-big ${tone}">${q.coverage.toFixed(1)}x</div>
+          <div class="fc-tgt muted">vs ${target.toFixed(1)}x target · quota $${quota.toFixed(0)}M</div>
+          <div class="fc-sec">
+            <span><b>$${q.weighted.toFixed(1)}M</b> <span class="muted">weighted</span></span>
+            <span class="sep">·</span>
+            <span><b>$${q.unweighted.toFixed(1)}M</b> <span class="muted">unweighted</span></span>
+            <span class="sep">·</span>
+            <span><b>${q.dealCount}</b> <span class="muted">deals</span></span>
+          </div>
+          ${showAction
+            ? `<div class="fc-action ${actionTone}">NEED <b>$${Math.max(0, need).toFixed(1)}M</b> MORE PIPE TO HIT ${target.toFixed(1)}x</div>`
+            : (q.isCurrent
+              ? `<div class="fc-action green">ON TRACK · ${(q.coverage / target * 100).toFixed(0)}% of ${target.toFixed(1)}x target</div>`
+              : `<div class="fc-action green">AT OR ABOVE TARGET</div>`)
+          }
+          ${mmFlag}
+        </div>`;
+    }).join("");
+
+    // Shared horizontal bar viz under the columns. Common scale = max(unweighted, quota×target) across all 3 quarters.
+    const PADL = 70, PADR = 18, PADT = 14, PADB = 30, WIDTH = 600, HEIGHT = 110;
+    const innerW = WIDTH - PADL - PADR;
+    const rowH   = (HEIGHT - PADT - PADB) / fc.quarters.length;
+    let scaleMax = 0;
+    fc.quarters.forEach(q => {
+      scaleMax = Math.max(scaleMax, q.unweighted, (fc.quotas[q.short] || 0) * target);
+    });
+    scaleMax = Math.ceil(scaleMax / 50) * 50; // round up to nice 50s
+
+    let bars = "";
+    fc.quarters.forEach((q, i) => {
+      const y = PADT + i * rowH + 4;
+      const h = rowH - 10;
+      const wU = (q.unweighted / scaleMax) * innerW;
+      const wW = (q.weighted   / scaleMax) * innerW;
+      const quota = fc.quotas[q.short] || 0;
+      const tgtX = PADL + (quota * target / scaleMax) * innerW;
+      const tone = toneFor(q.coverage);
+      const fillU = tone === "green" ? "var(--green)" : (tone === "amber" ? "var(--amber)" : "var(--red)");
+      bars += `
+        <text class="fc-row-lbl" x="${PADL - 10}" y="${y + h/2 + 4}" text-anchor="end">${esc(q.short)}</text>
+        <rect class="fc-bar-u" x="${PADL}" y="${y}" width="${wU}" height="${h}" fill="${fillU}" fill-opacity="0.25" stroke="${fillU}" stroke-width="1"></rect>
+        <rect class="fc-bar-w" x="${PADL}" y="${y + h*0.25}" width="${wW}" height="${h*0.5}" fill="${fillU}" fill-opacity="0.7"></rect>
+        <line class="fc-target-marker" x1="${tgtX}" y1="${y - 1}" x2="${tgtX}" y2="${y + h + 1}" stroke="var(--white)" stroke-width="1.5" stroke-dasharray="3 2"></line>
+        <text class="fc-row-val" x="${PADL + wU + 4}" y="${y + h/2 + 4}" fill="${fillU}">$${q.unweighted.toFixed(0)}M</text>`;
+    });
+    // X axis tick at scaleMax
+    const xMid = PADL + innerW * 0.5;
+    bars += `
+      <line x1="${PADL}" y1="${HEIGHT - PADB + 4}" x2="${PADL + innerW}" y2="${HEIGHT - PADB + 4}" stroke="var(--border-2)" stroke-width="1"></line>
+      <text class="fc-axis" x="${PADL}" y="${HEIGHT - 8}" text-anchor="start">$0</text>
+      <text class="fc-axis" x="${xMid}" y="${HEIGHT - 8}" text-anchor="middle">$${(scaleMax/2).toFixed(0)}M</text>
+      <text class="fc-axis" x="${PADL + innerW}" y="${HEIGHT - 8}" text-anchor="end">$${scaleMax.toFixed(0)}M</text>`;
+    svg.innerHTML = bars;
+
+    if (cap) {
+      const q3 = fc.quarters.find(q => q.short === "Q3");
+      const q4 = fc.quarters.find(q => q.short === "Q4");
+      const q3Need = q3 ? gapFor(q3) : 0;
+      const wkRunRate = (D.pipegen && D.pipegen.weeklyTarget) || 0;
+      const wksToFill = wkRunRate > 0 ? (q3Need / wkRunRate).toFixed(1) : "?";
+      cap.innerHTML = `Coverage target = <b>${target.toFixed(1)}x</b> unweighted pipe ÷ quota. Tone: <span class="green">green</span> ≥ ${target.toFixed(1)}x · <span class="amber">amber</span> ${(target*0.7).toFixed(1)}–${target.toFixed(1)}x · <span class="red">red</span> &lt; ${(target*0.7).toFixed(1)}x. At the current $${wkRunRate.toFixed(1)}M/wk pipegen run-rate, closing the Q3 gap is a <b>${wksToFill}-week</b> sprint of perfect pipegen — see PIPELINE CREATED panel.`;
+    }
+  }
+
   /* ---------- SLIPPAGE THIS QUARTER ---------- */
   // Computes the panel from D.slippage: header stat (deal count, $$ out,
   // QoQ delta), the per-deal table with severity-tinted amounts, and a
@@ -1348,7 +1473,7 @@
   }
   function runCommand(cmd) {
     if (cmd === "HELP") {
-      flash("CMDS: GO DASH | GO CHG | GO FUNNEL | GO FORECAST | GO DEALS | GO REPS | GO SLIP | GO PIPE | GO RISKS | GO AUD | FILTER NA/EMEA/APAC | FCST COMMIT/BEST | MOTION ALL/NEW/EXP | ROTATE");
+      flash("CMDS: GO DASH | GO CHG | GO FUNNEL | GO FORECAST | GO DEALS | GO REPS | GO SLIP | GO PIPE | GO COV | GO RISKS | GO AUD | FILTER NA/EMEA/APAC | FCST COMMIT/BEST | MOTION ALL/NEW/EXP | ROTATE");
       return;
     }
     const goMap = {
@@ -1358,6 +1483,7 @@
       "GO RISKS": "risks", "GO SLIP": "slippage", "GO SLIPPAGE": "slippage",
       "GO CHG": "changed", "GO CHANGED": "changed",
       "GO PIPE": "pipegen", "GO PIPEGEN": "pipegen",
+      "GO COV": "forward-cov", "GO COVERAGE": "forward-cov", "GO FCOV": "forward-cov",
       "GO AUD": "audience", "GO AUDIENCE": "audience",
       "GO NOTES": "release"
     };
@@ -1422,6 +1548,7 @@
     renderRisks();
     renderSlippage();
     renderPipegen();
+    renderForwardCoverage();
     renderInsight();
     bindRegen();
     bindCommand();
