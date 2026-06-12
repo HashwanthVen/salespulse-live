@@ -18,14 +18,16 @@ window.SALESPULSE_DATA = {
     { label: "Pipeline Coverage",   value: "3.1x",    delta: "vs 3.0x target", direction: "flat", tone: "good", note: "Above 3x rule of thumb." }
   ],
 
-  /* Funnel stages — value at each stage + count + conversion to next */
+  /* Funnel stages — value at each stage + count + conversion to next.
+     aging buckets show how long deals have been sitting in each stage; sums = count.
+     Closed Won is terminal so has no time-in-stage aging. */
   funnel: [
-    { stage: "Prospects",    value: 312.4, count: 1842, convPct: 38 },
-    { stage: "Qualified",    value: 184.6, count:  712, convPct: 52 },
-    { stage: "Discovery",    value:  96.8, count:  402, convPct: 65 },
-    { stage: "Proposal",     value:  62.4, count:  221, convPct: 58 },
-    { stage: "Negotiation",  value:  35.8, count:  108, convPct: 71 },
-    { stage: "Closed Won",   value:  25.4, count:   78, convPct: null }
+    { stage: "Prospects",    value: 312.4, count: 1842, convPct: 38,   aging: { d0_14: 1100, d15_30: 540, d30_plus: 202 } },
+    { stage: "Qualified",    value: 184.6, count:  712, convPct: 52,   aging: { d0_14:  420, d15_30: 220, d30_plus:  72 } },
+    { stage: "Discovery",    value:  96.8, count:  402, convPct: 65,   aging: { d0_14:  210, d15_30: 130, d30_plus:  62 } },
+    { stage: "Proposal",     value:  62.4, count:  221, convPct: 58,   aging: { d0_14:  120, d15_30:  65, d30_plus:  36 } },
+    { stage: "Negotiation",  value:  35.8, count:  108, convPct: 71,   aging: { d0_14:   55, d15_30:  35, d30_plus:  18 } },
+    { stage: "Closed Won",   value:  25.4, count:   78, convPct: null, aging: null }
   ],
 
   /* Forecast vs Quota trend (last 8 weeks, weighted commit) */

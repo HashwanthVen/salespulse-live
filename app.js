@@ -59,11 +59,20 @@
       if (conv != null) {
         convCls = conv >= 60 ? "good" : conv >= 40 ? "warn" : "bad";
       }
+      const a = f.aging;
+      const buckets = a ? `
+            <div class="funnel-buckets" aria-label="Deals by time in stage">
+              <span class="bucket"      title="Deals 0-14 days in stage"><span class="b-lbl">0-14d</span><b>${a.d0_14}</b></span>
+              <span class="bucket"      title="Deals 15-30 days in stage"><span class="b-lbl">15-30d</span><b>${a.d15_30}</b></span>
+              <span class="bucket old"  title="Stalled: 30+ days in stage"><span class="b-lbl">30d+</span><b>${a.d30_plus}</b></span>
+            </div>` : "";
       return `
         <div class="funnel-stage">
           <div class="funnel-name">${esc(f.stage)}</div>
-          <div class="funnel-bar-wrap">
-            <div class="funnel-bar" style="width:${pct.toFixed(1)}%;">${f.count} DEALS</div>
+          <div class="funnel-bar-col">
+            <div class="funnel-bar-wrap">
+              <div class="funnel-bar" style="width:${pct.toFixed(1)}%;">${f.count} DEALS</div>
+            </div>${buckets}
           </div>
           <div class="funnel-amount">$${f.value.toFixed(1)}M</div>
           <div class="funnel-conv ${convCls}">${conv != null ? "↘ " + conv + "%" : "— win —"}</div>
@@ -145,6 +154,17 @@
   }
 
   /* ---------- DEALS TABLE ---------- */
+  const LS_REP_KEY = "salespulse.currentRep";
+  let currentRep = (function () {
+    try {
+      const saved = localStorage.getItem(LS_REP_KEY);
+      const valid = D.reps.some((r) => r.name === saved);
+      if (valid) return saved;
+    } catch (e) { /* localStorage may be blocked */ }
+    return (D.reps[0] && D.reps[0].name) || "";
+  })();
+  let myDealsActive = false;
+
   function renderDeals(rows) {
     const tbody = $("deals-tbody");
     if (!tbody) return;
@@ -180,6 +200,7 @@
       .filter((d) => (!q || d.account.toLowerCase().includes(q)))
       .filter((d) => (rg === "all" || d.region === rg))
       .filter((d) => (fc === "all" || d.forecast === fc))
+      .filter((d) => (!myDealsActive || d.owner === currentRep))
       .sort((a, b) => b.amount - a.amount);
     renderDeals(rows);
   }
@@ -188,6 +209,40 @@
       const el = $(id); if (el) el.addEventListener("input", applyDealFilters);
       if (el) el.addEventListener("change", applyDealFilters);
     });
+  }
+  function updateMyDealsBtn() {
+    const btn = $("deal-mine");
+    if (!btn) return;
+    btn.classList.toggle("active", myDealsActive);
+    btn.setAttribute("aria-pressed", myDealsActive ? "true" : "false");
+    btn.textContent = myDealsActive ? `▣ MY DEALS · ${currentRep}` : "MY DEALS";
+    btn.setAttribute("title", myDealsActive
+      ? `Showing only deals owned by ${currentRep}. Click to clear.`
+      : `Filter Top Open Deals to those owned by ${currentRep}.`);
+  }
+  function bindMyDeals() {
+    const sel = $("deal-me");
+    const btn = $("deal-mine");
+    if (sel) {
+      sel.innerHTML = D.reps.map((r) =>
+        `<option value="${esc(r.name)}"${r.name === currentRep ? " selected" : ""}>${esc(r.name)} · ${esc(r.region)}</option>`
+      ).join("");
+      sel.value = currentRep;
+      sel.addEventListener("change", () => {
+        currentRep = sel.value;
+        try { localStorage.setItem(LS_REP_KEY, currentRep); } catch (e) {}
+        updateMyDealsBtn();
+        if (myDealsActive) applyDealFilters();
+      });
+    }
+    if (btn) {
+      btn.addEventListener("click", () => {
+        myDealsActive = !myDealsActive;
+        updateMyDealsBtn();
+        applyDealFilters();
+      });
+    }
+    updateMyDealsBtn();
   }
 
   /* ---------- REPS ---------- */
@@ -403,6 +458,7 @@
     bindToggle();
     renderDeals(D.topDeals.slice().sort((a,b) => b.amount - a.amount));
     bindDealFilters();
+    bindMyDeals();
     renderReps();
     renderSegments();
     renderRegions();

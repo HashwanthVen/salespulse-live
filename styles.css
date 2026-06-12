@@ -286,6 +286,7 @@ main { padding: 10px 12px 50px; max-width: 1600px; margin: 0 auto; }
   padding: 6px 10px;
   min-width: 160px;
 }
+.input.input-sm { min-width: 130px; padding: 6px 8px; font-size: 11px; }
 .input:focus, select:focus, textarea:focus { outline: none; border-color: var(--green); }
 .input::placeholder { color: var(--dimmer); }
 select option { background: var(--bg); color: var(--white); }
@@ -301,6 +302,10 @@ select option { background: var(--bg); color: var(--white); }
   display: inline-flex; align-items: center; gap: 6px;
 }
 .btn:hover { border-color: var(--green); color: var(--green); }
+.btn.active {
+  background: var(--green); color: #000; border-color: var(--green); font-weight: 700;
+}
+.btn.active:hover { background: var(--white); border-color: var(--white); color: #000; }
 .btn.primary {
   background: var(--green); color: #000; border-color: var(--green); font-weight: 700;
 }
@@ -352,6 +357,7 @@ select option { background: var(--bg); color: var(--white); }
 }
 .funnel-stage:last-child { border-bottom: none; }
 .funnel-name { color: var(--white); font-weight: 700; font-size: 12px; letter-spacing: 1px; text-transform: uppercase; }
+.funnel-bar-col { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .funnel-bar-wrap { background: var(--bg); border: 1px solid var(--border); height: 22px; position: relative; }
 .funnel-bar {
   height: 100%; background: linear-gradient(90deg, var(--green-dim), var(--green));
@@ -367,6 +373,19 @@ select option { background: var(--bg); color: var(--white); }
 .funnel-conv.good { color: var(--green); }
 .funnel-conv.warn { color: var(--amber); }
 .funnel-conv.bad  { color: var(--red); }
+
+/* FUNNEL AGING BUCKETS */
+.funnel-buckets { display: flex; gap: 6px; flex-wrap: wrap; font-size: 10px; }
+.bucket {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 1px 7px; border: 1px solid var(--border-2);
+  color: var(--dim); letter-spacing: 0.5px;
+  font-variant-numeric: tabular-nums;
+}
+.bucket .b-lbl { color: var(--dim); text-transform: uppercase; }
+.bucket b { color: var(--white); font-weight: 700; }
+.bucket.old { color: var(--red); border-color: rgba(255,82,82,0.4); background: rgba(255,82,82,0.05); }
+.bucket.old .b-lbl, .bucket.old b { color: var(--red); }
 
 /* REP TABLE */
 .attainment-bar { display: inline-block; width: 80px; height: 8px; background: var(--bg); border: 1px solid var(--border); vertical-align: middle; margin-right: 6px; }

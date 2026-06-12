@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>SALESPULSE LIVE · TERMINAL</title>
   <meta name="description" content="SalesPulse Live — Bloomberg-style sales pipeline command center for VPs of Sales, RevOps, and AEs. Synthetic data only." />
-  <link rel="stylesheet" href="styles.css?v=0.1.0" />
+  <link rel="stylesheet" href="styles.css?v=0.2.0" />
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to main content</a>
@@ -125,6 +125,8 @@
             <option value="bestcase">BEST CASE</option>
             <option value="upside">UPSIDE</option>
           </select>
+          <select id="deal-me" class="input input-sm" aria-label="Acting as rep" title="Who am I? Used by the MY DEALS filter."></select>
+          <button id="deal-mine" class="btn" type="button" aria-pressed="false" title="Filter to deals I own">MY DEALS</button>
         </div>
       </div>
       <div class="panel-body tight" style="overflow-x:auto;">
@@ -261,6 +263,7 @@
       </div>
       <div class="panel-body">
         <ul class="rel-list">
+          <li><span class="ver">v0.2</span> Pipeline Funnel: deal aging buckets per stage (0-14d / 15-30d / <span class="red">30d+</span>) — stalled deals now visible at a glance · Top Open Deals: one-click <b>MY DEALS</b> toggle (filters to the rep selected in the new ACTING AS picker, persisted across visits) · closes #2 and #4</li>
           <li><span class="ver">v0.1</span> Baseline SalesPulse Live dashboard · 6 KPIs · funnel · forecast vs quota · top deals · rep leaderboard · segments + regions · risks · live audience feedback</li>
         </ul>
       </div>
@@ -277,7 +280,7 @@
     <span class="seg right"><span class="l">SYS</span> <span id="clock2">--:--:--</span></span>
   </div>
 
-  <script src="data.js?v=0.1.0"></script>
-  <script src="app.js?v=0.1.0"></script>
+  <script src="data.js?v=0.2.0"></script>
+  <script src="app.js?v=0.2.0"></script>
 </body>
 </html>
