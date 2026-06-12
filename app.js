@@ -1671,6 +1671,239 @@
     return `BENCH: top-quartile on ${top.label.toLowerCase()} (${top.ourLabel} vs P75=${benchFormatQuartile(top.p75, top.fmt)}). Below-median on ${worst.label.toLowerCase()} (${worst.ourLabel} vs P50=${benchFormatQuartile(worst.p50, worst.fmt)}) — the single highest-leverage gap. Source: Pavilion SaaS Operator Benchmarks, mid-mkt $50-100M ARR, N=${D.benchmarks.sampleN}.`;
   }
 
+  /* ───────── SCENARIO MODELER · WHAT-IF (#31) ─────────
+     The CRO's actual weekly question — "if Northwind closes, where do we land?
+     if Yamada's bias unwinds, does coverage hold?" — was unanswerable without
+     a calculator. This module makes the dashboard prescriptive: 5 levers feed
+     a deterministic delta-sum against a baseline; result strip recomputes
+     instantly; scenario label auto-derives from net commit delta; presets
+     (BASELINE / BEST / WORST / BOARD-STRESS) one-click set all levers; state
+     persisted in localStorage; AI INSIGHTS bullet regenerates per scenario
+     shape. No LLM — deterministic precomputed deltas. */
+  const LS_SCENARIO_KEY = "salespulse.scenario";
+  let scnState = null;
+
+  function loadScenarioState() {
+    const defaults = {};
+    if (!D.scenario || !D.scenario.levers) return defaults;
+    D.scenario.levers.forEach((lv) => { defaults[lv.id] = lv.defaultValue; });
+    try {
+      const raw = localStorage.getItem(LS_SCENARIO_KEY);
+      if (!raw) return defaults;
+      const obj = JSON.parse(raw);
+      // Sanitize — only accept known lever ids + known option values.
+      D.scenario.levers.forEach((lv) => {
+        if (obj && Object.prototype.hasOwnProperty.call(obj, lv.id)) {
+          const ok = lv.options.some((o) => o.value === obj[lv.id]);
+          if (ok) defaults[lv.id] = obj[lv.id];
+        }
+      });
+    } catch (e) {}
+    return defaults;
+  }
+  function persistScenarioState() {
+    try { localStorage.setItem(LS_SCENARIO_KEY, JSON.stringify(scnState)); } catch (e) {}
+  }
+
+  function scenarioLeverById(id) {
+    return D.scenario.levers.find((lv) => lv.id === id) || null;
+  }
+  function scenarioOptionFor(lv, value) {
+    return lv.options.find((o) => o.value === value) || lv.options.find((o) => o.value === lv.defaultValue);
+  }
+
+  function computeScenarioResult() {
+    const b = D.scenario.baseline;
+    let dC = 0, dU = 0, dQ3 = 0;
+    D.scenario.levers.forEach((lv) => {
+      const opt = scenarioOptionFor(lv, scnState[lv.id]);
+      dC  += (opt.deltaCommit  || 0);
+      dU  += (opt.deltaUpside  || 0);
+      dQ3 += (opt.deltaQ3Coverage || 0);
+    });
+    const newCommit = b.commit + dC;
+    const newUpside = b.upside + dU;
+    const newQ3     = b.q3Coverage + dQ3;
+    const attainBase = b.commit / b.quota;
+    const attainNew  = newCommit / b.quota;
+    return {
+      dCommit: dC, dUpside: dU, dQ3Coverage: dQ3,
+      commitNew: newCommit, upsideNew: newUpside, q3New: newQ3,
+      attainBase: attainBase, attainNew: attainNew,
+      dAttainPp: (attainNew - attainBase) * 100
+    };
+  }
+
+  function scenarioLabel(dCommit) {
+    if (dCommit >= 2)    return { label: "BEST CASE",    cls: "scn-best",   warn: false };
+    if (dCommit >= 0.5)  return { label: "UPSIDE CASE",  cls: "scn-upside", warn: false };
+    if (dCommit <= -2)   return { label: "WORST CASE",   cls: "scn-worst",  warn: true  };
+    if (dCommit <= -0.5) return { label: "DOWNSIDE CASE",cls: "scn-down",   warn: false };
+    return { label: "STATUS QUO", cls: "scn-quo", warn: false };
+  }
+
+  function scenarioMismatchHTML() {
+    if (!D.forecast || typeof D.forecast.commit !== "number") return "";
+    const drift = Math.abs(D.scenario.baseline.commit - D.forecast.commit);
+    if (drift <= 0.1) return "";
+    return `<span class="expander-mismatch">⚠ MISMATCH (scenario baseline $${D.scenario.baseline.commit.toFixed(1)}M vs forecast commit $${D.forecast.commit.toFixed(1)}M)</span>`;
+  }
+
+  function renderScenario() {
+    if (!D.scenario || !D.scenario.levers) return;
+    const lvWrap = $("scn-levers"), resWrap = $("scn-result"), misWrap = $("scn-mismatch");
+    if (!lvWrap || !resWrap) return;
+    if (!scnState) scnState = loadScenarioState();
+    if (misWrap) misWrap.innerHTML = scenarioMismatchHTML();
+    // Levers
+    lvWrap.innerHTML = D.scenario.levers.map((lv) => {
+      const cur = scnState[lv.id] || lv.defaultValue;
+      const opt = scenarioOptionFor(lv, cur);
+      const xref = lv.crossRef ? `<span class="scn-xref" title="See related panel">${esc(lv.crossRef)}</span>` : "";
+      const opts = lv.options.map((o) => {
+        const sel = o.value === cur ? " selected" : "";
+        return `<option value="${esc(o.value)}"${sel}>${esc(o.label)}</option>`;
+      }).join("");
+      return `
+        <div class="scn-lever-row" data-lever="${esc(lv.id)}">
+          <label class="scn-lever-lbl" for="scn-${esc(lv.id)}">${esc(lv.label)} ${xref}</label>
+          <select id="scn-${esc(lv.id)}" class="scn-select" data-lever-id="${esc(lv.id)}" aria-label="${esc(lv.label)}">${opts}</select>
+          <span class="scn-lever-note">${esc(opt.note)}</span>
+        </div>`;
+    }).join("");
+    // Result
+    const r = computeScenarioResult();
+    const lbl = scenarioLabel(r.dCommit);
+    const sign = (n) => (n >= 0 ? "+" : "");
+    const fmtPct = (cur, base) => base === 0 ? "0.0" : ((cur - base) / base * 100).toFixed(1);
+    const dCommitCls = r.dCommit > 0 ? "green" : r.dCommit < 0 ? (r.dCommit <= -2 ? "red" : "amber") : "muted";
+    const dAttainCls = r.dAttainPp > 0 ? "green" : r.dAttainPp < 0 ? (r.dAttainPp <= -3 ? "red" : "amber") : "muted";
+    const dUpCls     = r.dUpside > 0 ? "green" : r.dUpside < 0 ? "amber" : "muted";
+    const warn = lbl.warn ? ' <span class="scn-warn">⚠</span>' : "";
+    resWrap.innerHTML = `
+      <div class="scn-result-head">RESULT <span class="muted">(vs baseline)</span>
+        <span class="scn-label ${lbl.cls}">SCENARIO: ${lbl.label}${warn}</span>
+      </div>
+      <div class="scn-result-grid">
+        <div class="scn-row">
+          <span class="scn-kpi">COMMIT</span>
+          <span class="scn-base">$${D.scenario.baseline.commit.toFixed(1)}M</span>
+          <span class="scn-arrow">→</span>
+          <span class="scn-new"><b>$${r.commitNew.toFixed(1)}M</b></span>
+          <span class="scn-delta ${dCommitCls}">Δ ${sign(r.dCommit)}$${r.dCommit.toFixed(1)}M (${sign(r.dCommit)}${fmtPct(r.commitNew, D.scenario.baseline.commit)}%)</span>
+          <span class="scn-attain ${dAttainCls}">ATTAIN ${(r.attainNew*100).toFixed(1)}% <span class="muted">Δ ${sign(r.dAttainPp)}${r.dAttainPp.toFixed(1)}pp</span></span>
+        </div>
+        <div class="scn-row">
+          <span class="scn-kpi">UPSIDE</span>
+          <span class="scn-base">$${D.scenario.baseline.upside.toFixed(1)}M</span>
+          <span class="scn-arrow">→</span>
+          <span class="scn-new"><b>$${r.upsideNew.toFixed(1)}M</b></span>
+          <span class="scn-delta ${dUpCls}">Δ ${sign(r.dUpside)}$${r.dUpside.toFixed(1)}M</span>
+        </div>
+        <div class="scn-row">
+          <span class="scn-kpi">Q3 COVERAGE</span>
+          <span class="scn-base">${D.scenario.baseline.q3Coverage.toFixed(1)}x</span>
+          <span class="scn-arrow">→</span>
+          <span class="scn-new"><b>${r.q3New.toFixed(1)}x</b></span>
+          <span class="scn-delta ${r.dQ3Coverage > 0 ? "green" : r.dQ3Coverage < 0 ? "amber" : "muted"}">Δ ${sign(r.dQ3Coverage)}${r.dQ3Coverage.toFixed(1)}x</span>
+        </div>
+      </div>`;
+  }
+
+  function applyScenarioPreset(name) {
+    const preset = D.scenario.presets && D.scenario.presets[name];
+    if (!preset) return;
+    if (!scnState) scnState = loadScenarioState();
+    Object.keys(preset).forEach((k) => { scnState[k] = preset[k]; });
+    persistScenarioState();
+    renderScenario();
+    pulseScenarioResult();
+    renderInsight();
+    refreshScnTicker();
+  }
+
+  function resetScenario() {
+    if (!D.scenario || !D.scenario.levers) return;
+    scnState = {};
+    D.scenario.levers.forEach((lv) => { scnState[lv.id] = lv.defaultValue; });
+    persistScenarioState();
+    renderScenario();
+    pulseScenarioResult();
+    renderInsight();
+    refreshScnTicker();
+  }
+
+  function pulseScenarioResult() {
+    const el = $("scn-result");
+    if (!el) return;
+    el.classList.remove("scn-pulse");
+    void el.offsetWidth;
+    el.classList.add("scn-pulse");
+  }
+
+  function refreshScnTicker() {
+    // Update the SCN ticker symbol live so the strip mirrors scenario state.
+    const tk = $("ticker-track");
+    if (!tk) return;
+    const r = computeScenarioResult();
+    const lbl = scenarioLabel(r.dCommit).label.replace(/\s+/g, "-");
+    const items = tk.querySelectorAll(".tk-item");
+    items.forEach((it) => {
+      const sym = it.querySelector(".tk-sym");
+      if (sym && sym.textContent.trim() === "SCN") {
+        const val = it.querySelector(".tk-val");
+        const chg = it.querySelector(".tk-chg");
+        if (val) val.textContent = lbl;
+        if (chg) chg.textContent = `Δ ${(r.dCommit >= 0 ? "+" : "")}$${r.dCommit.toFixed(1)}M COMMIT`;
+      }
+    });
+  }
+
+  function bindScenario() {
+    const lvWrap = $("scn-levers"), presetWrap = $("scenario-presets"), resetBtn = $("scn-reset");
+    if (lvWrap && !lvWrap.dataset.bound) {
+      lvWrap.dataset.bound = "1";
+      lvWrap.addEventListener("change", (ev) => {
+        const sel = ev.target.closest("select[data-lever-id]");
+        if (!sel) return;
+        if (!scnState) scnState = loadScenarioState();
+        scnState[sel.dataset.leverId] = sel.value;
+        persistScenarioState();
+        renderScenario();
+        renderInsight();
+        refreshScnTicker();
+      });
+    }
+    if (presetWrap && !presetWrap.dataset.bound) {
+      presetWrap.dataset.bound = "1";
+      presetWrap.addEventListener("click", (ev) => {
+        const b = ev.target.closest("button.scn-preset");
+        if (b) { applyScenarioPreset(b.dataset.preset); return; }
+        if (ev.target.closest("#scn-reset")) { resetScenario(); }
+      });
+    }
+    if (resetBtn && !resetBtn.dataset.bound) {
+      resetBtn.dataset.bound = "1";
+      resetBtn.addEventListener("click", resetScenario);
+    }
+  }
+
+  function scenarioInsightBullet() {
+    if (!D.scenario || !scnState) return null;
+    const r = computeScenarioResult();
+    const lbl = scenarioLabel(r.dCommit);
+    if (lbl.label === "STATUS QUO") {
+      return `SCENARIO: status quo. Quarter projecting $${r.commitNew.toFixed(1)}M (${(r.attainNew*100).toFixed(1)}% attain). If Northwind slips: attain ≈ 83%. If Northwind + Yamada both go south: ≈ 80%. Recommended hedge: assign exec-sponsor to Northwind this week.`;
+    }
+    if (lbl.label === "BEST CASE" || lbl.label === "UPSIDE CASE") {
+      return `SCENARIO active: ${lbl.label}. Commit $${r.commitNew.toFixed(1)}M (${(r.attainNew*100).toFixed(1)}% attain, ${r.dAttainPp >= 0 ? "+" : ""}${r.dAttainPp.toFixed(1)}pp). Stack-up requires holding all upside levers — verify exec-sponsor coverage on big bets (#29) before banking.`;
+    }
+    // downside / worst
+    return `SCENARIO active: ${lbl.label} ⚠. Commit $${r.commitNew.toFixed(1)}M (${(r.attainNew*100).toFixed(1)}% attain, ${r.dAttainPp.toFixed(1)}pp). Drivers: ${["northwind","yamada-bias"].map((id) => { const lv = scenarioLeverById(id); const opt = scenarioOptionFor(lv, scnState[id]); return `${lv.label.split(" ")[0]} ${opt.label}`; }).join(", ")}. Recovery levers: exec-sponsor push (+$0.9M) + win-rate normalize to P50 (+$1.4M) ⇒ partial recovery.`;
+  }
+
+  /* ───────── end SCENARIO MODELER ───────── */
+
   function renderDeals(rows) {
     const tbody = $("deals-tbody");
     if (!tbody) return;
@@ -2586,6 +2819,10 @@
       if (bb) items.unshift(bb);
     } catch (e) {}
     try {
+      const sb = scenarioInsightBullet();
+      if (sb) items.unshift(sb);
+    } catch (e) {}
+    try {
       const eb = expandedDealInsightBullet();
       if (eb) items.unshift(eb);
     } catch (e) {}
@@ -3176,7 +3413,7 @@
   }
   function runCommand(cmd) {
     if (cmd === "HELP") {
-      flash("CMDS: GO DASH | GO CHG | GO FUNNEL | GO FORECAST | GO DEALS | GO REPS | GO COACH | GO SLIP | GO PIPE | GO COV | GO RISKS | GO AUD | FILTER NA/EMEA/APAC | FCST COMMIT/BEST | MOTION ALL/NEW/EXP | LENS CRO/MGR/AE/CFO/CMO/BOARD/FULL | ROTATE");
+      flash("CMDS: GO DASH | GO CHG | GO FUNNEL | GO FORECAST | GO SCN | GO DEALS | GO REPS | GO COACH | GO SLIP | GO PIPE | GO COV | GO RISKS | GO AUD | FILTER NA/EMEA/APAC | FCST COMMIT/BEST | MOTION ALL/NEW/EXP | LENS CRO/MGR/AE/CFO/CMO/BOARD/FULL | ROTATE");
       return;
     }
     const goMap = {
@@ -3191,7 +3428,8 @@
       "GO AUD": "audience", "GO AUDIENCE": "audience",
       "GO NOTES": "release",
       "GO WL": "winloss", "GO WINLOSS": "winloss", "GO WIN": "winloss",
-      "GO BENCH": "benchmarks", "GO BENCHMARKS": "benchmarks"
+      "GO BENCH": "benchmarks", "GO BENCHMARKS": "benchmarks",
+      "GO SCN": "scenario", "GO SCENARIO": "scenario", "GO WHATIF": "scenario"
     };
     if (goMap[cmd]) { const el = document.getElementById(goMap[cmd]); if (el) el.scrollIntoView({ behavior: "smooth", block: "start" }); return; }
     if (cmd === "FCST COMMIT" || cmd === "FORECAST COMMIT") { setSeries("commit"); return; }
@@ -3355,16 +3593,16 @@
   // Each value = the set of panel IDs visible for that persona. "full" = null
   // means everything visible (no hide rules emitted).
   const LENS_MAP = {
-    cro:   new Set(["inbox","dashboard","benchmarks","forecast","changed","yoy","forward-cov","at-risk-reps","slippage","winloss","insights","audience","release"]),
-    mgr:   new Set(["inbox","dashboard","funnel","deals","reps","at-risk-reps","slippage","changed","winloss","insights","release"]),
+    cro:   new Set(["inbox","dashboard","benchmarks","forecast","scenario","changed","yoy","forward-cov","at-risk-reps","slippage","winloss","insights","audience","release"]),
+    mgr:   new Set(["inbox","dashboard","funnel","deals","scenario","reps","at-risk-reps","slippage","changed","winloss","insights","release"]),
     ae:    new Set(["inbox","dashboard","deals","insights","release"]),
-    cfo:   new Set(["dashboard","benchmarks","forecast","yoy","slippage","winloss","release"]),
+    cfo:   new Set(["dashboard","benchmarks","forecast","scenario","yoy","slippage","winloss","release"]),
     cmo:   new Set(["dashboard","benchmarks","pipegen","funnel","segments","winloss","insights","release"]),
-    board: new Set(["dashboard","benchmarks","forecast","yoy","winloss","insights","release"]),
+    board: new Set(["dashboard","benchmarks","forecast","scenario","yoy","winloss","insights","release"]),
     full:  null
   };
   const ALL_PANEL_IDS = [
-    "inbox","changed","yoy","dashboard","benchmarks","funnel","forecast","deals","slippage",
+    "inbox","changed","yoy","dashboard","benchmarks","funnel","forecast","scenario","deals","slippage",
     "pipegen","forward-cov","at-risk-reps","reps","segments","winloss","risks","insights","audience","release"
   ];
   const LENS_SHORTCUT_ORDER = ["cro","mgr","ae","cfo","cmo","board","full"];
@@ -3517,6 +3755,9 @@
     renderFunnel();
     renderChart(currentSeries);
     bindToggle();
+    renderScenario();
+    bindScenario();
+    refreshScnTicker();
     renderDeals(D.topDeals.slice().sort((a,b) => b.amount - a.amount));
     bindDealFilters();
     bindMyDeals();

@@ -146,6 +146,48 @@ window.SALESPULSE_DATA = {
     }
   },
 
+  /* SCENARIO MODELER (#31) — lever-driven what-if. Each lever has options
+     with deterministic delta values that get summed against the baseline.
+     Baseline is recomputed at render time from the live forecast/trend so a
+     reconciliation guard fires if values drift. Designed to make the dashboard
+     prescriptive — the CRO's weekly "if Northwind closes, where do we land?"
+     question is now answerable in one click. */
+  scenario: {
+    levers: [
+      { id: "northwind", label: "NORTHWIND $2.4M outcome", crossRef: null, options: [
+        { value: "closes",       label: "Closes this Q",         deltaCommit: +2.4, deltaUpside:  0,   deltaQ3Coverage:  0,    note: "Best case — clears the single-thread risk" },
+        { value: "on-track",     label: "On-track (current)",    deltaCommit:  0,   deltaUpside:  0,   deltaQ3Coverage:  0,    note: "Status quo (default)" },
+        { value: "slips-next-q", label: "Slips to Q3",           deltaCommit: -2.4, deltaUpside: +2.4, deltaQ3Coverage: +0.1,  note: "Pushes to next quarter" },
+        { value: "lost",         label: "Lost to competitor",    deltaCommit: -2.4, deltaUpside: -2.4, deltaQ3Coverage:  0,    note: "Worst case" }
+      ], defaultValue: "on-track" },
+      { id: "yamada-bias", label: "K.YAMADA bias unwind", crossRef: null, options: [
+        { value: "fully-unwinds", label: "Fully unwinds",  deltaCommit: -1.6, deltaUpside:  0,   deltaQ3Coverage: 0, note: "All over-committed deals slip" },
+        { value: "half-unwinds",  label: "Half unwinds",   deltaCommit: -0.8, deltaUpside:  0,   deltaQ3Coverage: 0, note: "Half of over-committed deals slip" },
+        { value: "status-quo",    label: "Status quo",     deltaCommit:  0,   deltaUpside:  0,   deltaQ3Coverage: 0, note: "Current (default)" },
+        { value: "holds-firm",    label: "Holds firm",     deltaCommit: +0.4, deltaUpside:  0,   deltaQ3Coverage: 0, note: "All over-committed deals close" }
+      ], defaultValue: "status-quo" },
+      { id: "exec-sponsor", label: "EXEC SPONSOR coverage push", crossRef: "#29 BIG BETS", options: [
+        { value: "assign-all-big-bets", label: "Assign all big bets", deltaCommit: +0.9, deltaUpside: +0.6, deltaQ3Coverage: 0, note: "Pavilion data: +12% win-rate lift on deals ≥ $1M" },
+        { value: "none",                label: "None (current)",      deltaCommit:  0,   deltaUpside:  0,   deltaQ3Coverage: 0, note: "Status quo (1 of 4 big bets unassigned)" }
+      ], defaultValue: "none" },
+      { id: "win-rate-bump", label: "Win-rate → Pavilion P50", crossRef: "#30 BENCHMARKS", options: [
+        { value: "normalize",  label: "Normalize to P50", deltaCommit: +1.4, deltaUpside: +0.4, deltaQ3Coverage: 0, note: "+4pp win-rate on late-stage deals" },
+        { value: "status-quo", label: "Status quo",        deltaCommit:  0,   deltaUpside:  0,   deltaQ3Coverage: 0, note: "Current 27% (at P50 already)" }
+      ], defaultValue: "status-quo" },
+      { id: "pipegen-bump", label: "Pipegen → Pavilion P50", crossRef: "#30 BENCHMARKS", options: [
+        { value: "normalize-next-q", label: "Normalize next Q",  deltaCommit: 0, deltaUpside: 0, deltaQ3Coverage: +0.5, note: "+$15.2M Q3 pipeline if pipegen normalizes" },
+        { value: "status-quo",       label: "Status quo",        deltaCommit: 0, deltaUpside: 0, deltaQ3Coverage:  0,   note: "Current 21% (below P50)" }
+      ], defaultValue: "status-quo" }
+    ],
+    presets: {
+      baseline: { northwind: "on-track", "yamada-bias": "status-quo", "exec-sponsor": "none",                "win-rate-bump": "status-quo", "pipegen-bump": "status-quo" },
+      best:     { northwind: "closes",   "yamada-bias": "holds-firm", "exec-sponsor": "assign-all-big-bets", "win-rate-bump": "normalize",  "pipegen-bump": "normalize-next-q" },
+      worst:    { northwind: "lost",     "yamada-bias": "fully-unwinds","exec-sponsor": "none",              "win-rate-bump": "status-quo", "pipegen-bump": "status-quo" },
+      stress:   { northwind: "slips-next-q","yamada-bias":"half-unwinds","exec-sponsor": "none",             "win-rate-bump": "status-quo", "pipegen-bump": "status-quo" }
+    },
+    baseline: { commit: 52.3, upside: 66.1, quota: 60.0, q3Coverage: 2.0 }
+  },
+
   /* Top deals — biggest open opportunities.
      motion = "new" (net-new logo) or "expansion" (upsell / renewal).
      Distribution: ~58% new / 42% expansion; every region and segment is
@@ -421,6 +463,7 @@ window.SALESPULSE_DATA = {
     { sym: "BENCH",    val: "P55",     chg: "INDEX 55 · PAVILION SaaS" },
     { sym: "INBOX",    val: "—",       chg: "ACTION QUEUE" },
     { sym: "REACH",    val: "0.67",    chg: "▼ 2 SINGLE-THREADED" },
+    { sym: "SCN",      val: "STATUS-QUO", chg: "5 LEVERS · WHAT-IF" },
     { sym: "USR",      val: "FULL",    chg: "LENS PERSONA" },
     { sym: "RIVERA",   val: "102%",    chg: "+2%" },
     { sym: "PATEL",    val: "88%",     chg: "+5%" },
