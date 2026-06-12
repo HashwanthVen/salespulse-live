@@ -98,12 +98,12 @@ window.SALESPULSE_DATA = {
      motionMix breaks each stage's value into New Logo / Expansion shares —
      expansion's share grows down the funnel because it converts better. */
   funnel: [
-    { stage: "Prospects",    value: 312.4, count: 1842, convPct: 38,   aging: { d0_14: 1100, d15_30: 540, d30_plus: 202 }, motionMix: { new: 0.70, expansion: 0.30 } },
-    { stage: "Qualified",    value: 184.6, count:  712, convPct: 52,   aging: { d0_14:  420, d15_30: 220, d30_plus:  72 }, motionMix: { new: 0.65, expansion: 0.35 } },
-    { stage: "Discovery",    value:  96.8, count:  402, convPct: 65,   aging: { d0_14:  210, d15_30: 130, d30_plus:  62 }, motionMix: { new: 0.60, expansion: 0.40 } },
-    { stage: "Proposal",     value:  62.4, count:  221, convPct: 58,   aging: { d0_14:  120, d15_30:  65, d30_plus:  36 }, motionMix: { new: 0.55, expansion: 0.45 } },
-    { stage: "Negotiation",  value:  35.8, count:  108, convPct: 71,   aging: { d0_14:   55, d15_30:  35, d30_plus:  18 }, motionMix: { new: 0.50, expansion: 0.50 } },
-    { stage: "Closed Won",   value:  25.4, count:   78, convPct: null, aging: null,                                          motionMix: { new: 0.45, expansion: 0.55 } }
+    { stage: "Prospects",    value: 312.4, count: 1842, convPct: 38,   aging: { d0_14: 1100, d15_30: 540, d30_plus: 202 }, motionMix: { new: 0.70, expansion: 0.30 }, medianDaysInStage: 12 },
+    { stage: "Qualified",    value: 184.6, count:  712, convPct: 52,   aging: { d0_14:  420, d15_30: 220, d30_plus:  72 }, motionMix: { new: 0.65, expansion: 0.35 }, medianDaysInStage:  9 },
+    { stage: "Discovery",    value:  96.8, count:  402, convPct: 65,   aging: { d0_14:  210, d15_30: 130, d30_plus:  62 }, motionMix: { new: 0.60, expansion: 0.40 }, medianDaysInStage: 14 },
+    { stage: "Proposal",     value:  62.4, count:  221, convPct: 58,   aging: { d0_14:  120, d15_30:  65, d30_plus:  36 }, motionMix: { new: 0.55, expansion: 0.45 }, medianDaysInStage: 22 },
+    { stage: "Negotiation",  value:  35.8, count:  108, convPct: 71,   aging: { d0_14:   55, d15_30:  35, d30_plus:  18 }, motionMix: { new: 0.50, expansion: 0.50 }, medianDaysInStage: 11 },
+    { stage: "Closed Won",   value:  25.4, count:   78, convPct: null, aging: null,                                          motionMix: { new: 0.45, expansion: 0.55 }, medianDaysInStage: null }
   ],
 
   /* Forecast vs Quota trend (last 8 weeks, weighted commit).
@@ -280,6 +280,7 @@ window.SALESPULSE_DATA = {
     [
       "Avg deal size dropped 3.2% QoQ — investigate whether discounting policies are being applied consistently.",
       "Sales cycle shortened by 4 days; mostly driven by faster Discovery→Proposal transitions.",
+      "Proposal stage takes 22 median days — 1.6× the 14-day benchmark — and drives most of the 68d total cycle (Prospects 12d · Qualified 9d · Discovery 14d · Proposal 22d · Negotiation 11d). The 4-day cycle improvement happened before Proposal; the friction now lives in pricing/legal templating. Action: assign Sales Ops to review pricing approval SLAs + Legal redline turnaround for in-quarter close acceleration.",
       "Win rate of 28.4% (TTM) trends above industry SaaS benchmark of 22%.",
       "Recommended action: document and propagate the playbook from the Negotiation stage where conversion is best-in-class."
     ]

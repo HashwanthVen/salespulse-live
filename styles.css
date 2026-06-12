@@ -1457,3 +1457,55 @@ main.lens-board section#inbox,
   .lens-chip,
   #lens-chip { transition: none; }
 }
+
+
+/* ===== PIPELINE FUNNEL — median days-in-stage (#13) ===== */
+.funnel-stage {
+  position: relative;
+}
+.funnel-med {
+  display: inline-block;
+  margin-left: 8px;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.5px;
+  font-weight: 700;
+  padding: 2px 5px;
+  border-radius: 2px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  vertical-align: middle;
+}
+.funnel-med.good { color: var(--green); border-color: var(--green-dim); }
+.funnel-med.warn { color: var(--amber); border-color: var(--amber); }
+.funnel-med.bad  { color: var(--red);   border-color: var(--red);   background: rgba(255, 82, 82, 0.05); }
+
+/* Caption below the funnel — total + longest-stage callout */
+.funnel-cycle {
+  margin-top: 10px;
+  padding: 6px 8px;
+  border-top: 1px dashed var(--border);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.4px;
+  color: var(--white);
+}
+.funnel-cycle .muted { color: var(--dim); }
+.funnel-cycle .bad   { color: var(--red); }
+
+/* Sales Cycle KPI tile — clickable affordance + cycle whisper line */
+.kpi[data-cycle-bound] { transition: border-color 120ms; }
+.kpi[data-cycle-bound]:hover { border-color: var(--green-dim); }
+.kpi[data-cycle-bound]:focus { outline: 1px solid var(--green); outline-offset: 1px; }
+.kpi .k-whisper-cycle { color: var(--dim); }
+.kpi .k-whisper-cycle b { color: var(--white); }
+
+/* Mobile: chip wraps under the bar like the aging buckets do today */
+@media (max-width: 480px) {
+  .funnel-med {
+    display: block;
+    margin: 4px 0 0;
+    width: max-content;
+  }
+  .funnel-cycle { font-size: 10.5px; }
+}

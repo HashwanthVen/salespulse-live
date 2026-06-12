@@ -109,7 +109,62 @@
     }).join("");
     grid.innerHTML = baseTiles + renderConcentrationTile();
     bindConcentration();
+    decorateSalesCycleTile();
     setText("kpi-stamp", "LAST UPD " + new Date().toISOString().slice(11, 19) + "Z");
+  }
+  // Adds the "LONGEST: <stage> (<X>D)" whisper + click-to-funnel handler to
+  // the Sales Cycle KPI tile (#13). Decoration is post-render so the generic
+  // tile template stays untouched — same pattern used by bindConcentration().
+  function decorateSalesCycleTile() {
+    const grid = $("kpi-grid");
+    if (!grid) return;
+    const tile = [...grid.querySelectorAll(".kpi")].find((el) => {
+      const lbl = el.querySelector(".k-label span");
+      return lbl && lbl.textContent.trim() === "Sales Cycle";
+    });
+    if (!tile) return;
+    const withMed = (D.funnel || []).filter((f) => f.medianDaysInStage != null);
+    if (!withMed.length) return;
+    const longest = withMed.slice().sort((a, b) =>
+      (b.medianDaysInStage / (STAGE_DAY_BENCHMARKS[b.stage] || 1)) -
+      (a.medianDaysInStage / (STAGE_DAY_BENCHMARKS[a.stage] || 1))
+    )[0];
+    if (!longest) return;
+    // Append the longest-stage whisper line. Reuses the existing .k-whisper
+    // visual treatment shipped in #10 for consistency.
+    if (!tile.querySelector(".k-whisper-cycle")) {
+      const w = document.createElement("div");
+      w.className = "k-whisper k-whisper-cycle";
+      w.title = "Click for stage-by-stage cycle breakdown";
+      w.innerHTML = `LONGEST: <b>${esc(longest.stage.toUpperCase())} (${longest.medianDaysInStage}D)</b>`;
+      tile.appendChild(w);
+    }
+    if (!tile.dataset.cycleBound) {
+      tile.dataset.cycleBound = "1";
+      tile.style.cursor = "pointer";
+      tile.setAttribute("tabindex", "0");
+      tile.setAttribute("role", "button");
+      tile.title = "Jump to PIPELINE FUNNEL — longest stage highlighted";
+      const jump = () => {
+        const panel = $("funnel");
+        if (!panel) return;
+        panel.scrollIntoView({ behavior: "smooth", block: "start" });
+        const row = panel.querySelector(`.funnel-stage[data-stage="${cssEscape(longest.stage)}"]`);
+        if (row) {
+          row.classList.add("highlight-pulse");
+          setTimeout(() => row.classList.remove("highlight-pulse"), 1600);
+        }
+      };
+      tile.addEventListener("click", jump);
+      tile.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); jump(); }
+      });
+    }
+  }
+  function cssEscape(s) {
+    // CSS.escape polyfill — stage names in this codebase are simple
+    // ASCII strings ("Proposal" etc) so a passthrough is safe.
+    return String(s);
   }
 
   /* ---------- TOP-3 CONCENTRATION (#11) ----------
@@ -527,6 +582,8 @@
     // motionMix share so the bars and dollar totals reflect the slice.
     // counts/aging are also scaled (rounded) because mocked exact counts
     // per motion aren't tracked — proportional split is the honest read.
+    // medianDaysInStage (#13) is intentionally NOT scaled — stage cycle
+    // time is the same physics whether you slice by motion or not.
     const m = currentMotion;
     function scaled(f) {
       if (m === "all" || !f.motionMix || f.motionMix[m] == null) {
@@ -557,8 +614,17 @@
               <span class="bucket"      title="Deals 15-30 days in stage"><span class="b-lbl">15-30d</span><b>${a.d15_30}</b></span>
               <span class="bucket old"  title="Stalled: 30+ days in stage"><span class="b-lbl">30d+</span><b>${a.d30_plus}</b></span>
             </div>` : "";
+      // Median days-in-stage chip (#13) — tone is per-stage benchmark.
+      const med = f.medianDaysInStage;
+      const bench = STAGE_DAY_BENCHMARKS[f.stage];
+      let medChip = "";
+      if (med != null && bench) {
+        const ratio = med / bench;
+        const medTone = ratio <= 1.0 ? "good" : ratio <= 1.5 ? "warn" : "bad";
+        medChip = `<span class="funnel-med ${medTone}" title="Median days in ${esc(f.stage)} stage · benchmark ${bench}d · ${ratio.toFixed(2)}× benchmark">MED ${med}D</span>`;
+      }
       return `
-        <div class="funnel-stage">
+        <div class="funnel-stage" data-stage="${esc(f.stage)}">
           <div class="funnel-name">${esc(f.stage)}</div>
           <div class="funnel-bar-col">
             <div class="funnel-bar-wrap">
@@ -567,9 +633,41 @@
           </div>
           <div class="funnel-amount">$${s.value.toFixed(1)}M</div>
           <div class="funnel-conv ${convCls}">${conv != null ? "↘ " + conv + "%" : "— win —"}</div>
+          ${medChip}
         </div>`;
     }).join("");
+
+    // Caption: TOTAL CYCLE: XD · LONGEST STAGE: <stage> (<X>D, <ratio>× BENCHMARK)
+    const cap = $("funnel-cycle");
+    if (cap) {
+      const withMed = D.funnel.filter((f) => f.medianDaysInStage != null);
+      const total = withMed.reduce((a, f) => a + f.medianDaysInStage, 0);
+      const longest = withMed.slice().sort((a, b) =>
+        (b.medianDaysInStage / (STAGE_DAY_BENCHMARKS[b.stage] || 1)) -
+        (a.medianDaysInStage / (STAGE_DAY_BENCHMARKS[a.stage] || 1))
+      )[0];
+      if (longest) {
+        const bench = STAGE_DAY_BENCHMARKS[longest.stage];
+        const ratio = bench ? (longest.medianDaysInStage / bench).toFixed(1) : null;
+        const ratioStr = ratio ? `, ${ratio}× BENCHMARK` : "";
+        cap.innerHTML =
+          `<span class="muted">TOTAL CYCLE:</span> <b>${total}D</b> ` +
+          `<span class="muted">·</span> ` +
+          `<span class="muted">LONGEST STAGE:</span> ` +
+          `<b class="bad">${esc(longest.stage.toUpperCase())} (${longest.medianDaysInStage}D${ratioStr})</b>`;
+      }
+    }
   }
+  // Per-stage benchmark median-days targets (#13). Document inline so the
+  // heuristic is explainable and easy to tune. Sourced from Clari/Gong public
+  // industry medians for B2B SaaS sales-cycle decomposition.
+  const STAGE_DAY_BENCHMARKS = {
+    "Prospects":   14,
+    "Qualified":   12,
+    "Discovery":   14,
+    "Proposal":    14,
+    "Negotiation": 12
+  };
 
   /* ---------- CHART: Forecast vs Quota ---------- */
   let currentSeries = "commit";
