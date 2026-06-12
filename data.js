@@ -30,12 +30,15 @@ window.SALESPULSE_DATA = {
     { stage: "Closed Won",   value:  25.4, count:   78, convPct: null, aging: null }
   ],
 
-  /* Forecast vs Quota trend (last 8 weeks, weighted commit) */
+  /* Forecast vs Quota trend (last 8 weeks, weighted commit).
+     forecastAccuracy = TTM (trailing twelve months) avg miss vs commit, used
+     to draw the confidence band around the commit series. */
   trend: {
     weeks: ["W1","W2","W3","W4","W5","W6","W7","W8"],
     commit:   [12.4, 18.7, 24.8, 30.2, 36.5, 42.8, 49.6, 55.9],   // running attainment
     bestcase: [14.8, 22.5, 30.1, 37.8, 45.6, 53.2, 61.4, 69.8],
-    quota:    [60.0, 60.0, 60.0, 60.0, 60.0, 60.0, 60.0, 60.0]
+    quota:    [60.0, 60.0, 60.0, 60.0, 60.0, 60.0, 60.0, 60.0],
+    forecastAccuracy: 0.07
   },
 
   /* Top deals — biggest open opportunities */

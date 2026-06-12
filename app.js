@@ -85,6 +85,7 @@
   function renderChart(series) {
     const svg = $("chart-svg");
     const stat = $("chart-stat");
+    const cap  = $("chart-caption");
     if (!svg) return;
     const W = 600, H = 240;
     const PADL = 40, PADR = 14, PADT = 18, PADB = 26;
@@ -93,7 +94,13 @@
     const values = D.trend[series];
     const quota = D.trend.quota;
     const weeks = D.trend.weeks;
+    const acc = D.trend.forecastAccuracy || 0;
+    const commitVals = D.trend.commit;
+    const showBand = series === "commit" && acc > 0;
     const all = values.concat(quota);
+    if (showBand) {
+      for (const v of commitVals) all.push(v * (1 + acc));
+    }
     const max = Math.max(...all);
     const min = 0;
     const range = Math.max(max - min, 1);
@@ -109,6 +116,16 @@
     }
     const xLabels = weeks.map((m, i) => `<text x="${toX(i)}" y="${H - 8}" text-anchor="middle">${esc(m)}</text>`).join("");
 
+    let bandSvg = "";
+    if (showBand) {
+      const upper = commitVals.map((v, i) => `${i === 0 ? "M" : "L"}${toX(i).toFixed(1)},${toY(v * (1 + acc)).toFixed(1)}`).join(" ");
+      let lower = "";
+      for (let i = commitVals.length - 1; i >= 0; i--) {
+        lower += ` L${toX(i).toFixed(1)},${toY(commitVals[i] * (1 - acc)).toFixed(1)}`;
+      }
+      bandSvg = `<path class="chart-band" d="${upper}${lower} Z"/>`;
+    }
+
     const linePath = values.map((v, i) => `${i === 0 ? "M" : "L"}${toX(i).toFixed(1)},${toY(v).toFixed(1)}`).join(" ");
     const areaPath = linePath + ` L${toX(values.length-1).toFixed(1)},${PADT+innerH} L${toX(0).toFixed(1)},${PADT+innerH} Z`;
     const quotaPath = quota.map((v, i) => `${i === 0 ? "M" : "L"}${toX(i).toFixed(1)},${toY(v).toFixed(1)}`).join(" ");
@@ -118,6 +135,7 @@
     svg.innerHTML = `
       <g class="chart-grid">${grid.join("")}</g>
       <g class="chart-axis">${xLabels}</g>
+      ${bandSvg}
       <path class="chart-area" d="${areaPath}"/>
       <path class="chart-line" d="${linePath}"/>
       <path class="chart-quota" d="${quotaPath}"/>
@@ -135,6 +153,11 @@
         <div><span>QUOTA</span><b>$${target.toFixed(1)}M</b></div>
         <div><span>GAP</span><b class="${gapCls}">${gap >= 0 ? "+" : ""}$${gap}M</b></div>
       `;
+    }
+    if (cap) {
+      cap.textContent = showBand
+        ? `Confidence band: ±${(acc * 100).toFixed(0)}% based on TTM forecast accuracy`
+        : "";
     }
   }
   function bindToggle() {

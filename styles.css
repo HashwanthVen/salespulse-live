@@ -245,6 +245,7 @@ main { padding: 10px 12px 50px; max-width: 1600px; margin: 0 auto; }
 .chart-grid line { stroke: var(--border); stroke-width: 1; }
 .chart-axis text { fill: var(--dim); font-family: var(--mono); font-size: 10px; }
 .chart-area  { fill: rgba(0,230,118,0.10); }
+.chart-band  { fill: var(--green-soft); fill-opacity: 0.15; stroke: none; pointer-events: none; }
 .chart-line  { fill: none; stroke: var(--green); stroke-width: 2; }
 .chart-line.amber { stroke: var(--amber); }
 .chart-line.cyan  { stroke: var(--cyan); }
@@ -261,9 +262,11 @@ main { padding: 10px 12px 50px; max-width: 1600px; margin: 0 auto; }
 .chart-stat span { color: var(--dim); }
 .chart-stat b { color: var(--white); font-weight: 700; margin-left: 4px; }
 .chart-legend {
-  display: flex; gap: 14px; padding: 0 14px 12px; font-size: 11px; color: var(--dim);
+  display: flex; gap: 14px; padding: 0 14px 6px; font-size: 11px; color: var(--dim);
 }
 .chart-legend .swatch { display: inline-block; width: 10px; height: 10px; vertical-align: middle; margin-right: 5px; }
+.chart-legend .swatch-band { background: var(--green-soft); opacity: 0.6; border: 1px solid var(--green-dim); }
+.chart-caption { padding: 0 14px 12px; font-size: 11px; color: var(--dim); min-height: 14px; }
 
 /* TOGGLES */
 .toggle-group { display: inline-flex; border: 1px solid var(--border-2); }
@@ -524,7 +527,27 @@ select option { background: var(--bg); color: var(--white); }
   .fkey { padding: 7px 10px; flex-shrink: 0; }
   .fkey.primary { margin-left: 0; }
   .hero { flex-direction: column; align-items: flex-start; }
-  .funnel-stage { grid-template-columns: 90px 1fr 80px; }
-  .funnel-stage .funnel-conv { display: none; }
+  /* Funnel mobile (#5): keep conversion label visible by stacking it as a
+     second-row caption under the bar/amount so every stage — including
+     Closed Won's "— win —" — renders consistently down to 360px. */
+  .funnel-stage {
+    grid-template-columns: 80px 1fr 70px;
+    grid-template-rows: auto auto;
+    column-gap: 8px;
+    row-gap: 2px;
+  }
+  .funnel-stage .funnel-name {
+    grid-column: 1; grid-row: 1 / span 2; align-self: center;
+  }
+  .funnel-stage .funnel-bar-col { grid-column: 2; grid-row: 1; }
+  .funnel-stage .funnel-amount  { grid-column: 3; grid-row: 1; }
+  .funnel-stage .funnel-conv {
+    display: block;
+    grid-column: 2 / span 2;
+    grid-row: 2;
+    text-align: left;
+    font-size: 10px;
+    padding-left: 2px;
+  }
   .status-bar { font-size: 10px; gap: 10px; padding: 4px 8px; overflow-x: auto; }
 }
