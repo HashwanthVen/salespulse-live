@@ -85,6 +85,18 @@
       const whisper = (showWhisper && prior && ps && ps.asOf)
         ? `<div class="k-whisper" title="Prior snapshot taken ${esc(ps.asOf)}">vs ${esc(ps.asOf)}: <b>${esc(prior)}</b> → <b>${esc(k.value)}</b></div>`
         : "";
+      // YoY second whisper line (#22): one tile per matching yoy key.
+      const yoy = (showWhisper && D.yoyComparison) ? yoyForKpi(k.label) : null;
+      const yoyWhisper = yoy
+        ? (function () {
+            const arrow = yoy.direction === "up" ? "▲" : "▼";
+            const cls   = yoy.direction === "up" ? "green" : "red";
+            const sign  = yoy.deltaPct >= 0 ? "+" : "";
+            const ptsUnit = yoy.unit === "pts" ? " pts" : "%";
+            const lyr   = fmtYoyVal(yoy.lastYr, yoy.unit);
+            return `<div class="k-whisper k-whisper-yoy" title="Same week-of-quarter comparison vs ${esc(D.yoyComparison.asOfLastYr)}">vs ${esc(D.yoyComparison.sameQLastYr)}: <b>${esc(lyr)}</b> <span class="${cls}">${arrow} ${sign}${yoy.deltaPct.toFixed(1)}${ptsUnit}</span></div>`;
+          })()
+        : "";
       return `
         <div class="kpi ${k.tone}">
           <div class="k-label"><span>${esc(k.label)}</span><span class="badge">LIVE</span></div>
@@ -92,6 +104,7 @@
           <div class="k-delta ${k.direction}">${arrow} ${esc(k.delta)}</div>
           <div class="k-note">${esc(k.note)}</div>
           ${whisper}
+          ${yoyWhisper}
         </div>`;
     }).join("");
     grid.innerHTML = baseTiles + renderConcentrationTile();
@@ -339,6 +352,171 @@
         });
       }
     }
+  }
+
+  /* ---------- YoY SAME-QUARTER COMPARE (#22) ----------
+     Compact 4-col panel that completes the temporal matrix
+     (WoW · YoY · forward projection). Reconciles THIS Q with the live
+     KPI snapshot; flags ⚠ MISMATCH if drift. Each KPI tile also gets a
+     second whisper line driven by the same dataset. */
+  function fmtYoyVal(v, unit) {
+    if (v == null) return "—";
+    switch (unit) {
+      case "$M":   return "$" + v.toFixed(1) + "M";
+      case "$K":   return "$" + Math.round(v) + "K";
+      case "%":
+      case "pts":  return v.toFixed(1) + "%";
+      case "days": return Math.round(v) + " days";
+      case "x":    return v.toFixed(1) + "x";
+      default:     return String(v);
+    }
+  }
+  // Map YoY entries to live KPI labels so we can reconcile / render the
+  // second whisper line. Mirrors KPI_PRIOR_KEY but yoy-side.
+  const YOY_TO_KPI_LABEL = {
+    pipelineValue:    "Pipeline Value",
+    weightedPipeline: "Weighted Pipeline",
+    winRate:          "Win Rate (TTM)",
+    avgDealSize:      "Avg Deal Size",
+    salesCycle:       "Sales Cycle",
+    coverage:         "Pipeline Coverage"
+  };
+  // Parse a KPI's displayed string back into the numeric basis used by yoy.
+  function parseKpiValue(label, raw) {
+    if (raw == null) return null;
+    const s = String(raw);
+    const num = parseFloat(s.replace(/[^\d.\-]/g, ""));
+    if (!isFinite(num)) return null;
+    if (label === "Avg Deal Size") return num; // displays $142K → 142
+    return num;
+  }
+  function yoyMatchesLive(y) {
+    const lbl = YOY_TO_KPI_LABEL[y.key];
+    if (!lbl) return true; // commit / slippage have no direct KPI tile
+    const live = (D.kpis || []).find((k) => k.label === lbl);
+    if (!live) return true;
+    const liveN = parseKpiValue(lbl, live.value);
+    if (liveN == null) return true;
+    return Math.abs(liveN - y.thisQ) < (Math.max(1, Math.abs(y.thisQ)) * 0.02 + 0.05);
+  }
+  function renderYoyPanel() {
+    const y = D.yoyComparison;
+    const tbody = $("yoy-tbody");
+    const sub   = $("yoy-sub");
+    const stat  = $("yoy-stat");
+    if (!y || !tbody) return;
+    if (sub) sub.textContent = y.period + " vs " + y.sameQLastYr;
+
+    // For slippage, "down" actually means "less slippage = good". For all
+    // others, "up" means "better". yoy entries already carry direction +
+    // tone so we just render them honestly.
+    let upCt = 0, downCt = 0, best = null, worst = null;
+    tbody.innerHTML = (y.kpis || []).map((k) => {
+      const goodDir = k.direction === "up";
+      if (goodDir) upCt++; else downCt++;
+      if (!best  || Math.abs(k.deltaPct) > Math.abs(best.deltaPct))  best  = goodDir ? k : best;
+      if (!worst || Math.abs(k.deltaPct) > Math.abs(worst.deltaPct)) worst = goodDir ? worst : k;
+      const arrow = goodDir ? "▲" : "▼";
+      const cls   = goodDir ? "green" : "red";
+      const mismatch = !yoyMatchesLive(k)
+        ? ` <span class="yoy-mismatch" title="THIS Q value drifted from live KPI snapshot — investigate data freshness">⚠ MISMATCH</span>`
+        : "";
+      return `
+        <tr>
+          <td><b>${esc(k.label)}</b></td>
+          <td class="num">${fmtYoyVal(k.thisQ, k.unit)}${mismatch}</td>
+          <td class="num muted">${fmtYoyVal(k.lastYr, k.unit)}</td>
+          <td class="num ${cls}"><b>${arrow} ${(k.deltaPct >= 0 ? "+" : "")}${k.deltaPct.toFixed(1)}${k.unit === "pts" ? " pts" : "%"}</b></td>
+        </tr>`;
+    }).join("");
+
+    // Recompute the "best" pick honestly: best = largest positive % among
+    // direction:up; worst = largest absolute % among direction:down.
+    const ups   = (y.kpis || []).filter((k) => k.direction === "up");
+    const downs = (y.kpis || []).filter((k) => k.direction !== "up");
+    const bestPick  = ups.sort((a, b)   => b.deltaPct - a.deltaPct)[0];
+    const worstPick = downs.sort((a, b) => Math.abs(b.deltaPct) - Math.abs(a.deltaPct))[0];
+
+    if (stat) {
+      stat.innerHTML =
+        `<span class="dh-label">YoY:</span> ` +
+        `<span class="dh-good">${upCt} UP</span> · ` +
+        `<span class="dh-bad">${downCt} DOWN</span>` +
+        (bestPick  ? ` · <span class="muted">BEST</span> <b class="green">${esc(bestPick.label)}</b> <span class="green">+${bestPick.deltaPct.toFixed(1)}%</span>` : "") +
+        (worstPick ? ` · <span class="muted">WORST</span> <b class="red">${esc(worstPick.label)}</b> <span class="red">${worstPick.deltaPct >= 0 ? "+" : ""}${worstPick.deltaPct.toFixed(1)}%</span>` : "");
+    }
+  }
+  // Look up the YoY entry whose key maps to a given KPI tile label.
+  function yoyForKpi(label) {
+    const y = D.yoyComparison;
+    if (!y || !y.kpis) return null;
+    const key = Object.keys(YOY_TO_KPI_LABEL).find((k) => YOY_TO_KPI_LABEL[k] === label);
+    if (!key) return null;
+    return y.kpis.find((k) => k.key === key) || null;
+  }
+
+  /* ---------- WHAT CHANGED basis toggle (#22) ----------
+     wow (default) shows the week-over-week priorSnapshot diff.
+     yoy switches just the commit-movement card to use yoyComparison's
+     commitAtW8 entry — deal / rep / risk lists don't have YoY series,
+     so we keep them as-is and label the basis. */
+  const LS_BASIS_KEY = "salespulse.changedBasis";
+  let changedBasis = (function () {
+    try { const v = localStorage.getItem(LS_BASIS_KEY); return v === "yoy" ? "yoy" : "wow"; }
+    catch (e) { return "wow"; }
+  })();
+  function renderChangedYoyCommit() {
+    const y = D.yoyComparison;
+    if (!y) return;
+    const commitEntry = (y.kpis || []).find((k) => k.key === "commitAtW8");
+    if (!commitEntry) return;
+    const commitEl = $("chg-commit");
+    if (!commitEl) return;
+    const diff = +(commitEntry.thisQ - commitEntry.lastYr).toFixed(1);
+    const cls  = diff >= 0 ? "green" : "red";
+    const arr  = diff >= 0 ? "▲" : "▼";
+    commitEl.innerHTML = `
+      <div class="card-title">COMMIT MOVEMENT <span class="muted" style="font-weight:400;">· YoY</span></div>
+      <div class="card-big">
+        <b class="green">$${commitEntry.thisQ.toFixed(1)}M</b>
+        <span class="muted">←</span>
+        <b>$${commitEntry.lastYr.toFixed(1)}M</b>
+      </div>
+      <div class="card-row">
+        <span class="${cls}"><b>${arr} $${Math.abs(diff).toFixed(1)}M</b></span>
+        <span class="muted">commit @ W8 vs ${esc(y.sameQLastYr)}</span>
+      </div>
+      <div class="card-row">
+        <span class="muted">basis</span>
+        <span>${esc(y.asOf)} vs ${esc(y.asOfLastYr)}</span>
+      </div>`;
+  }
+  function applyChangedBasis() {
+    const basisEl = $("chg-basis");
+    if (changedBasis === "yoy") {
+      const y = D.yoyComparison;
+      if (basisEl && y) basisEl.textContent = "vs " + y.sameQLastYr + " (YoY)";
+      renderChangedYoyCommit();
+    } else {
+      renderChanged(); // restores WoW snapshot rendering for all 4 cards
+    }
+    document.querySelectorAll("#changed .chg-toggle .seg").forEach((b) => {
+      const a = b.dataset.basis === changedBasis;
+      b.classList.toggle("active", a);
+      b.setAttribute("aria-pressed", a ? "true" : "false");
+    });
+  }
+  function bindChangedToggle() {
+    document.querySelectorAll("#changed .chg-toggle .seg").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const b = btn.dataset.basis;
+        if (b !== "wow" && b !== "yoy") return;
+        if (b === changedBasis) return;
+        changedBasis = b;
+        try { localStorage.setItem(LS_BASIS_KEY, changedBasis); } catch (e) {}
+        applyChangedBasis();
+      });
+    });
   }
 
   /* ---------- FUNNEL ---------- */
@@ -669,6 +847,18 @@
       `best case <span class="green">$${p.best.toFixed(1)}M</span> · ` +
       `vs <span class="amber">$${p.quota.toFixed(0)}M quota</span>` +
       (projGap >= 0 ? "" : ` · <span class="${projCls}">$${projAbs}M to close gap</span>`) +
+      (function () {
+        // YoY suffix (#22) — surface the year-ago commit @ same week in
+        // the hero strip so the temporal context is visible without
+        // scrolling to the YoY panel.
+        const y = D.yoyComparison;
+        if (!y || !y.kpis) return "";
+        const ce = y.kpis.find((k) => k.key === "commitAtW8");
+        if (!ce || ce.deltaPct == null) return "";
+        const sign = ce.deltaPct >= 0 ? "+" : "";
+        const cls  = ce.deltaPct >= 0 ? "green" : "red";
+        return ` · <span class="${cls}">commit ${sign}${ce.deltaPct.toFixed(0)}% YoY</span>`;
+      })() +
       ".";
   }
   function bindToggle() {
@@ -1872,6 +2062,9 @@
     tickClock(); setInterval(tickClock, 1000);
     renderKpis();
     renderChanged();
+    renderYoyPanel();
+    applyChangedBasis();
+    bindChangedToggle();
     renderFunnel();
     renderChart(currentSeries);
     bindToggle();

@@ -227,7 +227,31 @@ window.SALESPULSE_DATA = {
     pipelineGenNeeded: { Q3: 61.6, Q4: 132.2 }   // (quotaQ × 3) − unweighted
   },
 
-  /* AI insights — 3 rotating sets */
+  /* YoY SAME-QUARTER COMPARE (#22) — completes the temporal matrix
+     (WoW via priorSnapshot · YoY via yoyComparison · forward via
+     projection #17 + forwardCoverage #16). `thisQ` values MUST reconcile
+     with the existing `kpis` snapshot — renderYoyPanel() shows a
+     ⚠ MISMATCH chip if drift is detected. Story: 7 of 8 KPIs are UP YoY
+     (textbook growth quarter), but slippage is +45% — the lone regression
+     that explains why commit feels tight despite a strong top line. */
+  yoyComparison: {
+    period:       "Q2 FY26",
+    sameQLastYr:  "Q2 FY25",
+    asOf:         "Jun 12, 2026",
+    asOfLastYr:   "Jun 13, 2025",
+    kpis: [
+      // unit examples: "$M", "%", "pts", "days", "x"
+      { key: "pipelineValue",    label: "Pipeline Value",     unit: "$M",   thisQ: 184.2, lastYr: 156.4, deltaPct: 17.8,  direction: "up",   tone: "good" },
+      { key: "weightedPipeline", label: "Weighted Pipeline",  unit: "$M",   thisQ:  58.7, lastYr:  48.2, deltaPct: 21.8,  direction: "up",   tone: "good" },
+      { key: "winRate",          label: "Win Rate (TTM)",     unit: "pts",  thisQ:  28.4, lastYr:  26.1, deltaPct:  2.3,  direction: "up",   tone: "good" },
+      { key: "avgDealSize",      label: "Avg Deal Size",      unit: "$K",   thisQ:   142, lastYr:   128, deltaPct: 10.9,  direction: "up",   tone: "good" },
+      { key: "salesCycle",       label: "Sales Cycle",        unit: "days", thisQ:    68, lastYr:    75, deltaPct: -9.3,  direction: "up",   tone: "good" },
+      { key: "coverage",         label: "Pipeline Coverage",  unit: "x",    thisQ:   3.1, lastYr:   2.8, deltaPct: 10.7,  direction: "up",   tone: "good" },
+      { key: "commitAtW8",       label: "Commit @ W8 / 13",   unit: "$M",   thisQ:  55.9, lastYr:  46.2, deltaPct: 21.0,  direction: "up",   tone: "good" },
+      { key: "slippage",         label: "Slippage",           unit: "$M",   thisQ:   8.4, lastYr:   5.8, deltaPct: 45.1,  direction: "down", tone: "warn" }
+    ],
+    insightHook: "7 of 8 KPIs up YoY — the textbook growth-quarter footprint. The single regression: slippage is +45% YoY ($5.8M → $8.4M). That's the dollar amount of 'looked-good-on-paper' commit that didn't actually land in-period — and it's the friction tax behind why the strong top-line numbers don't feel like a strong quarter at the Friday call."
+  },
   insights: [
     [
       "Pipeline coverage is healthy at 3.1x, but Q2 commit-only stands at $55.9M vs $60M quota — best case is needed to hit number.",
@@ -249,6 +273,7 @@ window.SALESPULSE_DATA = {
       "Forecast reliability: 74% of committed $$ is from RELIABLE forecasters (Rivera/Patel/Okafor). K. Yamada has missed commit by 11–18% for 4 quarters straight — currently calling ~$2.4M; historical bias suggests true landing is closer to $2.0M. E. Sokolova consistently SANDBAGS by 18–25% — $1.2M of upside hidden in her best-case. Net read: discount Yamada's commit, treat Sokolova's best as commit-eligible.",
       "AT-RISK REPS coaching list: 5 of 6 reps trigger at least one watchlist rule this week. Sokolova (41% + activity 55), Yamada (58% + chronic over-commit), Chen (76% + cold Fabrikam deal + WoW −6pts), Okafor (64%), Rivera (top deal Northwind has no next step). Top-3 concentration deals are owned by 3 of these 5 reps — concentration risk compounds with rep risk. Action: open AT-RISK REPS panel before today's 1:1 prep — 30 minutes of pre-work already done.",
       "QUAL gap: Northwind ($2.4M @ 75% commit) scores 4/8 on MEDDIC — missing Decision Criteria, Decision Process, Champion, and Paper Process. It's the single largest un-defensible commit deal in the book and the lone WEAK-COMMIT alarm. Historical land rate on qual < 5/8 is ~35% below qual ≥ 6/8 — so projection's $59.2M midpoint is generous if Northwind doesn't tighten. Action: assign manager pipe-review to identify EB + champion + close-plan by Friday or move to bestcase.",
+      "YoY same-quarter: 7 of 8 KPIs are UP vs Q2 FY25 — pipeline +17.8%, weighted +21.8%, commit @ W8 +21%, avg deal +10.9%, cycle −7 days. The lone regression is slippage at +45% YoY ($5.8M → $8.4M). The growth-quarter footprint is real, but slippage is the friction tax behind why a +21% commit feels tight at Friday call. Action: cross-reference SLIPPAGE THIS QUARTER panel for the 6 deals that drove $8.4M of out-of-period push — fix the playbook, not the forecast.",
       "Activity score for E. Sokolova (55) is below threshold — coaching candidate.",
       "Recommended action: re-balance territory coverage in EMEA Mid-Market."
     ],
@@ -297,6 +322,7 @@ window.SALESPULSE_DATA = {
     { sym: "RELY",     val: "74%",     chg: "COMMIT $ FROM RELIABLE" },
     { sym: "RISKREP",  val: "5/6",     chg: "▼ ON COACHING LIST" },
     { sym: "QUAL",     val: "4.8/8",   chg: "▼ 1 WEAK COMMIT" },
+    { sym: "YOY",      val: "+17.8%",  chg: "PIPE vs Q2 FY25" },
     { sym: "RIVERA",   val: "102%",    chg: "+2%" },
     { sym: "PATEL",    val: "88%",     chg: "+5%" },
     { sym: "CHEN",     val: "76%",     chg: "+3%" },

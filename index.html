@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>SALESPULSE LIVE · TERMINAL</title>
   <meta name="description" content="SalesPulse Live — Bloomberg-style sales pipeline command center for VPs of Sales, RevOps, and AEs. Synthetic data only." />
-  <link rel="stylesheet" href="styles.css?v=0.16.0" />
+  <link rel="stylesheet" href="styles.css?v=0.17.0" />
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to main content</a>
@@ -74,7 +74,11 @@
         <span class="title" id="chg-title">WHAT CHANGED SINCE LAST FORECAST</span>
         <span class="sub" id="chg-basis">SNAPSHOT DIFF</span>
         <div class="right">
-          <span class="muted" style="font-size:10px;">Click a deal row to jump to TOP OPEN DEALS</span>
+          <span class="chg-toggle" role="group" aria-label="Comparison basis">
+            <button type="button" class="seg active" data-basis="wow" aria-pressed="true" title="Week-over-week vs prior snapshot">WoW</button>
+            <button type="button" class="seg"        data-basis="yoy" aria-pressed="false" title="Year-over-year vs same quarter last year">YoY</button>
+          </span>
+          <span class="muted" style="font-size:10px;margin-left:8px;">Click a deal row to jump to TOP OPEN DEALS</span>
         </div>
       </div>
       <div class="panel-body tight">
@@ -84,6 +88,31 @@
           <div class="change-card" id="chg-reps"    aria-label="Rep attainment moves"></div>
           <div class="change-card" id="chg-risks"   aria-label="Risks added or resolved"></div>
         </div>
+      </div>
+    </section>
+
+    <!-- YoY SAME-QUARTER COMPARE (#22) -->
+    <section id="yoy" class="panel" aria-labelledby="yoy-title">
+      <div class="panel-head">
+        <span class="title" id="yoy-title">YoY SAME-QUARTER COMPARE</span>
+        <span class="sub" id="yoy-sub">Q2 FY26 vs Q2 FY25</span>
+        <span class="deals-health" id="yoy-stat" aria-live="polite"></span>
+        <div class="right">
+          <span class="muted" style="font-size:10px;">Same week-of-quarter comparison · reconciles with KPI DESK</span>
+        </div>
+      </div>
+      <div class="panel-body tight" style="overflow-x:auto;">
+        <table class="data-table" id="yoy-table">
+          <thead>
+            <tr>
+              <th>KPI</th>
+              <th class="num">THIS Q</th>
+              <th class="num">SAME Q LAST YR</th>
+              <th class="num">YoY Δ</th>
+            </tr>
+          </thead>
+          <tbody id="yoy-tbody"></tbody>
+        </table>
       </div>
     </section>
 
@@ -393,6 +422,7 @@
       </div>
       <div class="panel-body">
         <ul class="rel-list">
+          <li><span class="ver">v0.17</span> <b>YoY SAME-QUARTER COMPARE — completes the temporal matrix</b> — adds the dimension every board-deck and CFO conversation needs but the dashboard didn't render. New compact 4-column panel (KPI · THIS Q · SAME Q LAST YR · YoY Δ) sits between WHAT CHANGED and KPI DESK, comparing 8 KPIs at the same week-of-quarter (Jun 12 2026 vs Jun 13 2025): Pipeline Value, Weighted Pipeline, Win Rate, Avg Deal Size, Sales Cycle, Coverage, Commit @ W8/13, and Slippage. Story: <b>7 of 8 UP YoY</b> (pipeline +17.8% · weighted +21.8% · commit +21% · cycle −7d) with <i>slippage +45.1%</i> as the lone regression — the friction-tax dimension that explains why a strong top-line doesn't feel strong at the Friday call. Panel-head summary stat: <i>N UP · M DOWN · BEST · WORST</i>. THIS Q reconciles automatically with the existing KPI DESK; a <i>⚠ MISMATCH</i> chip appears if drift is detected (reuses #16 pattern). Each KPI tile gains a second <i>vs Jun 2025</i> whisper line under the #10 WoW whisper — so an AE/CRO sees temporal context at three depths (week / year / projection) in the same tile. HERO STRIP appends <i>· commit +21% YoY</i>. WHAT CHANGED panel gets a <b>WoW | YoY</b> toggle in the header — flipping to YoY re-renders the commit-movement card against the year-ago basis instead of the week-ago snapshot; persisted in <i>localStorage.salespulse.changedBasis</i>. New <b>YOY</b> ticker (<i>+17.8% PIPE vs Q2 FY25</i>) + AI insight bullet quantifies which 7 are up and why slippage is the one to fix · contributes to #3 (broader vs-what labeling remains open) · closes #22</li>
           <li><span class="ver">v0.16</span> <b>QUAL column on TOP OPEN DEALS — MEDDIC 0-8 score + weak-commit alarm</b> — completes the daily-use trinity (momentum + next-step + qual) on the most-trafficked panel. New sortable <b>QUAL</b> column between MOMENTUM and CLOSE renders a tone-colored <i>X/8</i> score (green ≥ 6 · amber 4-5 · red ≤ 3) + an 8-cell segmented bar in MEDDPICC order (M·E·D·D·I·C·P·C) so an AE can see at a glance <i>which</i> letters are missing without opening the deal. Hover the bar to list the missed checks by name. Panel-head micro-stat: <b>QUAL HEALTH: X.X/8 AVG · N WEAK-COMMIT DEALS</b> where weak = <i>prob ≥ 70 AND qual &lt; 5/8</i> — clickable to filter the table to just those deals (persisted in localStorage). TOP-3 CONCENTRATION tooltip now appends top-3 avg qual. PROJECTED Q-END methodology tooltip notes that qual &lt; 5/8 deals historically land 35% less often than qual ≥ 6/8 — so the projection range should be read with that lens. New AI insight bullet names Northwind ($2.4M, 4/8) as the single largest commit-defensibility gap in the book. Mobile (≤480px): column collapses to numeric only, tap reveals the bar · closes #20</li>
           <li><span class="ver">v0.15</span> <b>AT-RISK REPS — auto-derived coaching list</b> — saves Sales Mgrs ~30 min of pre-1:1 prep. New panel above REPS+SEGMENTS row surfaces every rep who trips any of 6 watchlist rules: <i>attain &lt; 70 · activity &lt; 65 · over-commit + behind · top deal missing next step · cold top deal (engagement &lt; 40) · WoW attain ≤ −3pts</i>. Each row shows the rep + region + bias chip, the highest-severity reason chip (RED if 2+ rules, AMBER if 1), an auto-generated one-line rationale that combines all triggered rules, and a suggested action chip (<b>PIPE REVIEW · 1:1 COACH · RAMP CHECK · DEAL INSPECT</b>). Panel header rollup: <i>N reps at risk · N need 1:1 this week</i> (or <i>ALL REPS ON TRACK</i> in green). Each row is clickable — scrolls to the REP LEADERBOARD and pulses that rep. TOP-3 CONCENTRATION tooltip now appends top-3 owners and flags any owner who's on the coaching list — concentration + rep risk now visibly compound. New <b>RISKREP</b> ticker symbol + new AI insight bullet quantifies which 5 of 6 reps are flagged + how concentration risk overlaps. New commands <b>GO COACH / GO RISK / GO ATRISK</b>. Mobile: each row's rationale wraps under the rep name; action chip remains visible · closes #21</li>
           <li><span class="ver">v0.14</span> <b>REP LEADERBOARD: FCST ACC + BIAS columns (last 4Q) + reliability rollup</b> — answers the CRO's #1 Friday-call question (<i>"whose forecast can I actually trust?"</i>) before commit gets rolled up. Two new right-aligned columns: <b>FCST ACC</b> shows last-4Q rep forecast accuracy %, tone-colored green ≥ 80 / amber 65–79 / red &lt; 65. <b>BIAS</b> chip flags <i>RELIABLE</i> (green), <i>SANDBAG</i> (amber), or <i>OVER</i> (red) with a hover tooltip surfacing the actual last-4Q (actual−commit)/commit values + a 4-dot sparkline of the same. Panel header gains a <b>RELIABILITY</b> rollup: % of pipeline-weighted commit from RELIABLE forecasters + counts of sandbaggers / over-committers. FORECAST vs QUOTA chart caption appends a reliability whisper estimating $$ over-commit risk and $$ sandbag upside hidden in the current commit. WHAT CHANGED SINCE LAST FORECAST cross-references with a <b>RELY/SAND/OVER</b> mini-chip next to each moving rep — so a +10pt jump from a SANDBAGGER reads differently than the same jump from an OVER-COMMITTER. New <b>RELY</b> ticker · new AI insight bullet quantifies Yamada's likely $0.4M overstatement + Sokolova's $1.2M hidden upside. PROJECTED Q-END comment now flags the future weight-by-reliability follow-up · closes #19</li>
@@ -424,7 +454,7 @@
     <span class="seg right"><span class="l">SYS</span> <span id="clock2">--:--:--</span></span>
   </div>
 
-  <script src="data.js?v=0.16.0"></script>
-  <script src="app.js?v=0.16.0"></script>
+  <script src="data.js?v=0.17.0"></script>
+  <script src="app.js?v=0.17.0"></script>
 </body>
 </html>

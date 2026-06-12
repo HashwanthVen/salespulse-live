@@ -319,6 +319,39 @@ main { padding: 10px 12px 50px; max-width: 1600px; margin: 0 auto; }
   font-variant-numeric: tabular-nums;
 }
 .kpi .k-whisper b { color: var(--dim); font-weight: 700; }
+/* YoY whisper line (#22) — second whisper under the WoW one. No top
+   border so the two lines read as a stacked temporal stack. */
+.kpi .k-whisper-yoy {
+  border-top: none; padding-top: 0; margin-top: 1px;
+}
+.kpi .k-whisper-yoy .green { color: var(--green); font-weight: 700; }
+.kpi .k-whisper-yoy .red   { color: var(--red);   font-weight: 700; }
+
+/* YoY SAME-QUARTER panel (#22) — compact data table reuse +
+   a few standalone tweaks for the mismatch chip + summary stat. */
+#yoy .data-table tbody td { padding: 5px 10px; }
+#yoy .data-table tbody tr:nth-child(odd) { background: rgba(255,255,255,0.012); }
+.yoy-mismatch {
+  display: inline-block; margin-left: 6px; padding: 0 4px;
+  font-size: 9px; font-weight: 700; color: var(--bg);
+  background: var(--amber); border-radius: 1px; vertical-align: 1px;
+}
+
+/* WoW | YoY toggle in the WHAT CHANGED panel head (#22). */
+.chg-toggle {
+  display: inline-flex; gap: 0; border: 1px solid var(--border);
+  font-family: var(--mono); font-size: 10px; letter-spacing: 0.5px;
+  vertical-align: middle;
+}
+.chg-toggle .seg {
+  background: transparent; color: var(--dim); border: 0;
+  padding: 2px 8px; cursor: pointer; font: inherit;
+}
+.chg-toggle .seg:hover { color: var(--green); }
+.chg-toggle .seg.active {
+  background: var(--green-soft); color: var(--green); font-weight: 700;
+}
+.chg-toggle .seg + .seg { border-left: 1px solid var(--border); }
 
 /* TOP-3 CONCENTRATION tile (#11) — clickable KPI variant with a
    colored footer micro-stat showing the "if top 3 slip" gap to quota.
