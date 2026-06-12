@@ -1868,7 +1868,14 @@
   function renderInsight() {
     const list = $("insight-list");
     if (!list) return;
-    const items = D.insights[insightIdx % D.insights.length];
+    const items = D.insights[insightIdx % D.insights.length].slice();
+    // Prepend a live computed inbox bullet so AI INSIGHTS always reflects the
+    // top action in the current queue — keeps the panel actionable even as
+    // upstream signals shift.
+    try {
+      const ib = inboxAiBullet();
+      if (ib) items.unshift(ib);
+    } catch (e) {}
     list.innerHTML = items.map((s) => `<li>${esc(s)}</li>`).join("");
   }
   function bindRegen() {
@@ -1877,6 +1884,463 @@
       insightIdx = (insightIdx + 1) % D.insights.length;
       renderInsight();
     });
+  }
+
+  /* ---------- ACTION INBOX (#23) ----------
+     Consolidated, deduped, ranked queue of every red/amber across the
+     dashboard with one-click jump-to-context. Aggregation only — never
+     introduces new mock data, just reads existing panels' source data.
+
+     Sources (9): slippage (#8) · missing/overdue next-step (#15) ·
+     cold momentum (#14) · weak-commit MEDDIC (#20) · at-risk reps (#21) ·
+     WoW negative prob moves ≥ $1M impact (#10) · forward coverage gap (#16) ·
+     top-3 concentration (#11) · over-committer in commit (#19).
+
+     Dedup: items sharing an account merge into one row. severity = max,
+     amount = max deal amount (NOT summed — that double-counts the same $$),
+     title concatenates the underlying issue bullets, category = "multi". */
+  const LS_INBOX_VIEW = "salespulse.inboxView";
+  let inboxView = (function () {
+    try { const v = localStorage.getItem(LS_INBOX_VIEW); return ["all","high","account","rep"].includes(v) ? v : "all"; }
+    catch (e) { return "all"; }
+  })();
+  const INBOX_SEV_RANK = { high: 3, medium: 2, low: 1 };
+  const INBOX_SEV_DOT  = { high: "red", medium: "amber", low: "green" };
+  const INBOX_MAX_VISIBLE = 12;
+
+  function inboxSeverityFromAmount(amt, hi, mid) {
+    if (amt >= hi)  return "high";
+    if (amt >= mid) return "medium";
+    return "low";
+  }
+  function missedMeddicNames(d) {
+    if (!d.meddic || typeof MEDDIC_ORDER === "undefined") return "";
+    return MEDDIC_ORDER.filter((k) => !d.meddic[k]).map((k) => MEDDIC_LABEL[k]).join(", ");
+  }
+  function buildInboxItems() {
+    const items = [];
+
+    // 1) Slippage (#8) — every slipped deal ≥ $500K.
+    ((D.slippage && D.slippage.items) || []).forEach((s) => {
+      if (s.amount < 500000) return;
+      items.push({
+        severity: inboxSeverityFromAmount(s.amount, 1500000, 500000),
+        category: "slippage",
+        account:  s.account,
+        owner:    s.owner,
+        title:    `${s.account} — slipped to ${s.toClose} (${s.reason})`,
+        rationale:`$${(s.amount/1e6).toFixed(2)}M slipped out of Q2`,
+        amount:   s.amount,
+        jumpAccount: s.account,
+        suggestedAction: "PIPE REVIEW"
+      });
+    });
+
+    // 2) Missing / overdue next-step (#15) — every top deal in bad health.
+    (D.topDeals || []).forEach((d) => {
+      const h = dealHealth(d);
+      if (h !== "missing" && h !== "overdue") return;
+      const sev = (d.amount >= 1000000 && d.forecast === "commit")
+        ? "high" : inboxSeverityFromAmount(d.amount, 1500000, 500000);
+      const reason = h === "missing"
+        ? "no next step logged"
+        : `${Math.abs(d.nextStep.daysFromNow)}d overdue — ${d.nextStep.action}`;
+      items.push({
+        severity: sev, category: "next-step",
+        account:  d.account, owner: d.owner,
+        title:    `${d.account} — ${reason}`,
+        rationale:`${(d.forecast||"").toUpperCase()} · $${(d.amount/1e6).toFixed(2)}M · ${d.prob}%`,
+        amount:   d.amount,
+        jumpAccount: d.account,
+        suggestedAction: "DEAL INSPECT"
+      });
+    });
+
+    // 3) Cold momentum (#14) — engagement score < 40.
+    (D.topDeals || []).forEach((d) => {
+      if (!d.engagement || d.engagement.score >= 40) return;
+      items.push({
+        severity: inboxSeverityFromAmount(d.amount, 1500000, 500000),
+        category: "momentum",
+        account:  d.account, owner: d.owner,
+        title:    `${d.account} — cold momentum (score ${d.engagement.score}, last touch ${d.engagement.lastTouchDays}d ago)`,
+        rationale:`${(d.forecast||"").toUpperCase()} · $${(d.amount/1e6).toFixed(2)}M · engagement trending ${d.engagement.trend||"flat"}`,
+        amount:   d.amount,
+        jumpAccount: d.account,
+        suggestedAction: "DEAL INSPECT"
+      });
+    });
+
+    // 4) Weak commit MEDDIC (#20) — prob ≥ 70 AND qual < 5/8.
+    if (typeof qualScore === "function") {
+      (D.topDeals || []).forEach((d) => {
+        if (!d.meddic) return;
+        const s = qualScore(d);
+        if (!(d.prob >= 70 && s < 5)) return;
+        const gaps = missedMeddicNames(d);
+        items.push({
+          severity: "high", category: "qual",
+          account:  d.account, owner: d.owner,
+          title:    `${d.account} — weak commit (qual ${s}/8, prob ${d.prob}%)`,
+          rationale:`Un-defensible at ${(d.forecast||"").toUpperCase()} band · gaps: ${gaps}`,
+          amount:   d.amount,
+          jumpAccount: d.account,
+          suggestedAction: "PIPE REVIEW"
+        });
+      });
+    }
+
+    // 5) At-risk reps (#21) — reuse the existing computeAtRiskReps() output.
+    if (typeof computeAtRiskReps === "function") {
+      computeAtRiskReps().forEach((w) => {
+        if (!w.rep) return;
+        const sev = w.tone === "red" ? "high" : "medium";
+        items.push({
+          severity: sev, category: "rep-risk",
+          owner: w.rep.name,
+          title:    `${w.rep.name} — ${w.primary.text}`,
+          rationale:w.rationale || `attain ${w.rep.attain}% · ${w.rep.region}`,
+          amount:   0,
+          jumpSelector: "#at-risk-reps",
+          suggestedAction: w.action || "1:1 COACH"
+        });
+      });
+    }
+
+    // 6) Negative WoW prob moves (#10) — only if implied $$ ≥ $1M.
+    const ps = D.priorSnapshot;
+    if (ps && Array.isArray(ps.dealProbDeltas)) {
+      ps.dealProbDeltas.forEach((d) => {
+        const diff = (d.newProb || 0) - (d.oldProb || 0);
+        if (diff >= 0) return;
+        const impact = (d.amount || 0) * (Math.abs(diff) / 100);
+        if (impact < 1000000) return;
+        const sev = impact >= 2000000 ? "high" : "medium";
+        items.push({
+          severity: sev, category: "wow-move",
+          account:  d.account,
+          title:    `${d.account} — prob dropped ${d.oldProb}% → ${d.newProb}% (${diff}pts)`,
+          rationale:`Implied $$ impact $${(impact/1e6).toFixed(2)}M (amount × prob delta)`,
+          amount:   d.amount || 0,
+          jumpAccount: d.account,
+          suggestedAction: "DEAL INSPECT"
+        });
+      });
+    }
+
+    // 7) Forward coverage gap (#16) — any non-current quarter under 2.5x.
+    if (D.forwardCoverage && Array.isArray(D.forwardCoverage.quarters)) {
+      D.forwardCoverage.quarters.forEach((q) => {
+        if (q.isCurrent) return;
+        if (q.coverage >= 2.5) return;
+        const need = (D.forwardCoverage.pipelineGenNeeded || {})[q.short];
+        items.push({
+          severity: "high", category: "coverage",
+          title:    `${q.label} — coverage ${q.coverage.toFixed(1)}x vs 3.0x target`,
+          rationale:`Need $${(need != null ? need : 0).toFixed(1)}M more unweighted in ${q.weeksRemaining} weeks`,
+          amount:   0,
+          jumpSelector: "#forward-cov",
+          suggestedAction: "PIPE GEN"
+        });
+      });
+    }
+
+    // 8) Top-3 concentration alarm (#11) — if top-3 ≥ 40% of weighted pipe.
+    (function () {
+      const all = (D.topDeals || []).slice();
+      const totalW = all.reduce((a, d) => a + (d.amount * d.prob / 100), 0);
+      if (totalW <= 0) return;
+      const sorted = all.sort((a, b) => (b.amount*b.prob/100) - (a.amount*a.prob/100));
+      const top3 = sorted.slice(0, 3);
+      const top3W = top3.reduce((a, d) => a + (d.amount*d.prob/100), 0);
+      const sharePct = (top3W / totalW) * 100;
+      if (sharePct < 40) return;
+      items.push({
+        severity: "high", category: "concentration",
+        title:    `Top-3 concentration alarm — ${sharePct.toFixed(0)}% of weighted pipe in 3 accounts`,
+        rationale:`${top3.map((d) => d.account).join(", ")} · single point of failure if any slips`,
+        amount:   top3W * 1e6 / 1e6, // already in $, keep as $
+        jumpSelector: "#kpi-conc",
+        suggestedAction: "PIPE REVIEW"
+      });
+    })();
+
+    // 9) Over-committer in commit (#19) — chronic over-commit reps with ≥ $1M in commit.
+    (D.reps || []).forEach((rp) => {
+      if (!rp.forecastHistory || rp.forecastHistory.bias !== "over-commit") return;
+      const inCommit = (D.topDeals || [])
+        .filter((d) => d.owner === rp.name && d.forecast === "commit")
+        .reduce((a, d) => a + d.amount, 0);
+      if (inCommit < 1000000) return;
+      items.push({
+        severity: "medium", category: "rep-risk",
+        owner:    rp.name,
+        title:    `${rp.name} — over-committer carrying $${(inCommit/1e6).toFixed(2)}M in commit`,
+        rationale:`Last 4Q (actual−commit)/commit: ${rp.forecastHistory.last4Q.join(", ")} — discount commit at recal`,
+        amount:   inCommit,
+        jumpSelector: "#reps",
+        suggestedAction: "FORECAST RECAL"
+      });
+    });
+
+    return items;
+  }
+  function dedupeInboxItems(items) {
+    const out = new Map();
+    items.forEach((it) => {
+      const key = it.account || ("__noacct:" + it.category + ":" + (it.owner || it.title));
+      const prev = out.get(key);
+      if (!prev) {
+        out.set(key, Object.assign({}, it, {
+          _titles: [it.title],
+          _cats:   [it.category],
+          _actions:[it.suggestedAction]
+        }));
+        return;
+      }
+      if (INBOX_SEV_RANK[it.severity] > INBOX_SEV_RANK[prev.severity]) prev.severity = it.severity;
+      if (!prev._titles.includes(it.title))  prev._titles.push(it.title);
+      if (!prev._cats.includes(it.category)) prev._cats.push(it.category);
+      if (!prev._actions.includes(it.suggestedAction)) prev._actions.push(it.suggestedAction);
+      // amount: take the max — DO NOT sum (same deal in multiple sources).
+      if ((it.amount || 0) > (prev.amount || 0)) prev.amount = it.amount;
+    });
+    return [...out.values()].map((it) => {
+      if (it._titles.length > 1) {
+        it.category = "multi";
+        it.title    = `${it.account || it.owner || ""} — ${it._titles.length} alerts (${it._cats.join(" + ")})`;
+        it.rationale= it._titles.map((t) => "• " + t).join("  ");
+      }
+      delete it._titles; delete it._cats; delete it._actions;
+      return it;
+    });
+  }
+  function sortInbox(items) {
+    return items.slice().sort((a, b) => {
+      const s = (INBOX_SEV_RANK[b.severity] || 0) - (INBOX_SEV_RANK[a.severity] || 0);
+      if (s !== 0) return s;
+      const a$ = b.amount - a.amount;
+      if (a$ !== 0) return a$;
+      return (a.category || "").localeCompare(b.category || "");
+    });
+  }
+  function truncate(s, n) {
+    s = String(s || "");
+    return s.length > n ? s.slice(0, n - 1) + "…" : s;
+  }
+  function inboxItemRow(it) {
+    const sevTone = INBOX_SEV_DOT[it.severity] || "amber";
+    const acts = {
+      "PIPE REVIEW":   "red",
+      "DEAL INSPECT":  "amber",
+      "1:1 COACH":     "amber",
+      "PIPE GEN":      "red",
+      "FORECAST RECAL":"amber",
+      "COMPETE PLAY":  "amber",
+      "RAMP CHECK":    "amber"
+    };
+    const actCls = acts[it.suggestedAction] || "muted";
+    const amt = it.amount > 0
+      ? `<span class="inbox-amt num">$${(it.amount/1e6).toFixed(2)}M</span>`
+      : `<span class="inbox-amt num muted">—</span>`;
+    const target = it.jumpAccount
+      ? ` data-account="${esc(it.jumpAccount)}"`
+      : (it.jumpSelector ? ` data-jump="${esc(it.jumpSelector)}"` : "");
+    return `
+      <li class="inbox-row" tabindex="0" role="button" title="${esc(it.title + (it.rationale ? " · " + it.rationale : ""))}"${target}>
+        <span class="inbox-sev sev-${sevTone}" aria-label="${esc(it.severity)} severity">●</span>
+        <span class="inbox-cat cat-${esc(it.category)}">${esc(truncate(String(it.category||"").toUpperCase(), 8))}</span>
+        <span class="inbox-title">${esc(truncate(it.title, 80))}</span>
+        ${amt}
+        <span class="inbox-act act-${actCls}">${esc(it.suggestedAction)}</span>
+      </li>`;
+  }
+  function inboxBucketed(items, bucketKey) {
+    const buckets = new Map();
+    items.forEach((it) => {
+      const k = (it[bucketKey] || "(unassigned)");
+      if (!buckets.has(k)) buckets.set(k, []);
+      buckets.get(k).push(it);
+    });
+    // Sort buckets by total $$ at risk desc.
+    const ord = [...buckets.entries()].map(([k, list]) => ({
+      key: k,
+      list,
+      tot: list.reduce((a, x) => a + (x.amount || 0), 0)
+    })).sort((a, b) => b.tot - a.tot);
+    return ord.map((g) => {
+      const lbl = bucketKey === "account" ? "ACCOUNT" : "REP";
+      const totLbl = g.tot > 0 ? `$${(g.tot/1e6).toFixed(2)}M` : "—";
+      return `<li class="inbox-bucket-head">${esc(lbl)}: <b>${esc(g.key)}</b> <span class="muted">· ${g.list.length} item${g.list.length>1?"s":""} · ${totLbl}</span></li>` +
+        sortInbox(g.list).map(inboxItemRow).join("");
+    }).join("");
+  }
+  let inboxLastItems = [];
+  function renderInbox() {
+    const ul   = $("inbox-list");
+    const stat = $("inbox-stat");
+    const more = $("inbox-more");
+    const segH = $("status-inbox");
+    const segV = $("status-inbox-val");
+    if (!ul) return;
+
+    const raw   = buildInboxItems();
+    const items = sortInbox(dedupeInboxItems(raw));
+    inboxLastItems = items;
+    const hi = items.filter((i) => i.severity === "high").length;
+    const md = items.filter((i) => i.severity === "medium").length;
+    const lo = items.filter((i) => i.severity === "low").length;
+    const totalAtRisk = items.reduce((a, i) => a + (i.amount || 0), 0);
+
+    // Filter chips: ALL, HIGH ONLY, BY ACCOUNT, BY REP.
+    let view = items;
+    if (inboxView === "high") view = items.filter((i) => i.severity === "high");
+
+    // Empty / All-clear.
+    if (items.length === 0) {
+      ul.innerHTML = `<li class="inbox-empty"><b class="green">ALL CLEAR — NO ACTIONS PENDING</b><br><span class="muted">Friday looks easy. Go close something.</span></li>`;
+      if (stat) stat.innerHTML = `<span class="dh-label">INBOX:</span> <span class="dh-good">0 ACTIONS</span>`;
+      if (more) more.hidden = true;
+      if (segV) segV.innerHTML = `<span class="green">0●</span>`;
+      if (segH) segH.classList.remove("bad","warn");
+    } else {
+      if (inboxView === "account") {
+        ul.innerHTML = inboxBucketed(view, "account");
+      } else if (inboxView === "rep") {
+        ul.innerHTML = inboxBucketed(view, "owner");
+      } else {
+        const visible = view.slice(0, INBOX_MAX_VISIBLE);
+        const hidden  = view.slice(INBOX_MAX_VISIBLE);
+        ul.innerHTML = visible.map(inboxItemRow).join("");
+        if (more) {
+          if (hidden.length > 0) {
+            more.hidden = false;
+            more.innerHTML = `<button type="button" class="btn sm" id="inbox-expand">+ ${hidden.length} MORE</button>`;
+            const btn = $("inbox-expand");
+            if (btn) btn.addEventListener("click", () => {
+              ul.insertAdjacentHTML("beforeend", hidden.map(inboxItemRow).join(""));
+              more.hidden = true;
+              bindInboxRows();
+            });
+          } else {
+            more.hidden = true; more.innerHTML = "";
+          }
+        }
+      }
+
+      if (stat) {
+        stat.innerHTML =
+          `<span class="dh-label">INBOX:</span> ` +
+          `<b>${items.length} ACTIONS</b> · ` +
+          `<span class="muted">$${(totalAtRisk/1e6).toFixed(1)}M AT RISK</span> · ` +
+          `<span class="dh-bad">${hi}● HIGH</span> · ` +
+          `<span class="dh-warn">${md}● MED</span> · ` +
+          `<span class="dh-good">${lo}● LOW</span>`;
+      }
+      // Status bar segment color-toned by highest queue severity.
+      if (segV && segH) {
+        const tone = hi > 0 ? "red" : md > 0 ? "amber" : "green";
+        segV.innerHTML = `<span class="${tone}">${items.length}●</span>`;
+        segH.classList.remove("bad","warn");
+        if (tone === "red") segH.classList.add("bad");
+        else if (tone === "amber") segH.classList.add("warn");
+      }
+    }
+
+    // Toggle states.
+    document.querySelectorAll("#inbox .inbox-filters .seg").forEach((b) => {
+      const a = b.dataset.inboxView === inboxView;
+      b.classList.toggle("active", a);
+      b.setAttribute("aria-pressed", a ? "true" : "false");
+    });
+
+    bindInboxRows();
+
+    // Live INBOX ticker — count + total $$ at risk.
+    if (D.ticker && Array.isArray(D.ticker)) {
+      const t = D.ticker.find((x) => x.sym === "INBOX");
+      if (t) {
+        if (items.length === 0) {
+          t.val = "CLEAR";
+          t.chg = "+0 ACTIONS";
+        } else {
+          const totalAtRisk = items.reduce((a, i) => a + (i.amount || 0), 0);
+          t.val = `${items.length}●`;
+          t.chg = `-$${(totalAtRisk/1e6).toFixed(1)}M AT RISK`;
+        }
+        try { renderTicker(); } catch (e) {}
+      }
+    }
+  }
+  function bindInboxRows() {
+    document.querySelectorAll("#inbox-list .inbox-row").forEach((row) => {
+      if (row.dataset.bound) return;
+      row.dataset.bound = "1";
+      const fire = (e) => {
+        if (e.type === "keydown" && e.key !== "Enter" && e.key !== " ") return;
+        e.preventDefault();
+        const acct = row.dataset.account;
+        const sel  = row.dataset.jump;
+        if (acct) { highlightDealRow(acct); return; }
+        if (sel) {
+          const el = document.querySelector(sel);
+          if (!el) return;
+          el.scrollIntoView({ behavior: "smooth", block: "center" });
+          el.classList.add("highlight-pulse");
+          setTimeout(() => el.classList.remove("highlight-pulse"), 1600);
+        }
+      };
+      row.addEventListener("click",   fire);
+      row.addEventListener("keydown", fire);
+    });
+  }
+  function bindInboxFilters() {
+    document.querySelectorAll("#inbox .inbox-filters .seg").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const v = btn.dataset.inboxView;
+        if (v === inboxView) return;
+        inboxView = v;
+        try { localStorage.setItem(LS_INBOX_VIEW, inboxView); } catch (e) {}
+        renderInbox();
+      });
+    });
+    const segH = $("status-inbox");
+    if (segH) {
+      const jump = () => {
+        const el = $("inbox");
+        if (!el) return;
+        el.scrollIntoView({ behavior: "smooth", block: "start" });
+        el.classList.add("highlight-pulse");
+        setTimeout(() => el.classList.remove("highlight-pulse"), 1600);
+      };
+      segH.addEventListener("click", jump);
+      segH.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); jump(); }
+      });
+    }
+  }
+  // Render-time AI insight bullet derived from current inbox contents.
+  function inboxAiBullet() {
+    const items = inboxLastItems.length ? inboxLastItems : sortInbox(dedupeInboxItems(buildInboxItems()));
+    if (!items.length) return null;
+    const hi = items.filter((i) => i.severity === "high");
+    const totalAtRisk = items.reduce((a, i) => a + (i.amount || 0), 0);
+    // Find account that appears in most underlying sources (multi-category dedup).
+    const rawCounts = {};
+    buildInboxItems().forEach((it) => {
+      const k = it.account; if (!k) return;
+      rawCounts[k] = (rawCounts[k] || 0) + 1;
+    });
+    let topAcct = null, topCt = 0;
+    Object.keys(rawCounts).forEach((k) => { if (rawCounts[k] > topCt) { topCt = rawCounts[k]; topAcct = k; } });
+    let bullet = `ACTION INBOX: ${items.length} actions tonight — $${(totalAtRisk/1e6).toFixed(1)}M at risk across ${hi.length} high-severity item${hi.length===1?"":"s"}.`;
+    if (topAcct && topCt >= 2) {
+      const acctItem = items.find((i) => i.account === topAcct);
+      const acctAmt  = acctItem ? acctItem.amount : 0;
+      const pctOfRisk = totalAtRisk > 0 ? (acctAmt / totalAtRisk) * 100 : 0;
+      bullet += ` Top action: ${topAcct} surfaces in ${topCt} alerts. One pipe-review fixes ~${pctOfRisk.toFixed(0)}% of total $$ at risk.`;
+    }
+    return bullet;
   }
 
   /* ---------- AUDIENCE FEEDBACK (GitHub Issues API) ---------- */
@@ -2080,6 +2544,8 @@
     renderSlippage();
     renderPipegen();
     renderForwardCoverage();
+    renderInbox();
+    bindInboxFilters();
     renderInsight();
     bindRegen();
     bindCommand();
