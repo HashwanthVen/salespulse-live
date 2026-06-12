@@ -10,6 +10,39 @@ window.SALESPULSE_DATA = {
     weekNow:    8   // current week index (matches trend.weeks.length)
   },
 
+  /* Prior-week snapshot — powers WHAT CHANGED SINCE LAST FORECAST panel.
+     Story (intentional): commit recovered +$3.6M WoW driven entirely by
+     S. Rivera jumping 92→102 (closed 2 big deals); Northwind slipped -10
+     prob (now in slippage) and Litware -15 (new competitor risk), partially
+     offsetting. EMEA coverage closed, Litware competitor risk opened. */
+  priorSnapshot: {
+    asOf: "Jun 5, 2026",
+    kpis: {
+      pipelineValue:    "$181.4M",
+      weightedPipeline: "$56.2M",
+      winRate:          "27.8%",
+      avgDealSize:      "$146K",
+      salesCycle:       "70 days",
+      coverage:         "3.0x"
+    },
+    commit:   52.3,
+    bestcase: 66.1,
+    dealProbDeltas: [
+      { account: "Northwind Industries", oldProb: 85, newProb: 75, amount: 2400000 },
+      { account: "Adventure Works",      oldProb: 65, newProb: 80, amount: 1100000 },
+      { account: "Lucerne Publishing",   oldProb: 55, newProb: 70, amount:  720000 },
+      { account: "Litware Inc.",         oldProb: 65, newProb: 50, amount:  680000 },
+      { account: "Margie's Travel",      oldProb: 50, newProb: 65, amount:  480000 }
+    ],
+    repAttainDeltas: [
+      { name: "S. Rivera",   oldAttain:  92, newAttain: 102 },
+      { name: "M. Chen",     oldAttain:  82, newAttain:  76 },
+      { name: "E. Sokolova", oldAttain:  38, newAttain:  41 }
+    ],
+    newRisks:    ["Litware Inc. — competitor mentioned in last call notes"],
+    closedRisks: ["EMEA pipeline coverage below 2x"]
+  },
+
   /* Top-line KPIs */
   kpis: [
     { label: "Pipeline Value",      value: "$184.2M", delta: "+12.4%",    direction: "up",   tone: "good", note: "Total weighted + unweighted." },
@@ -122,6 +155,7 @@ window.SALESPULSE_DATA = {
   insights: [
     [
       "Pipeline coverage is healthy at 3.1x, but Q2 commit-only stands at $55.9M vs $60M quota — best case is needed to hit number.",
+      "Commit recovered +$3.6M WoW ($52.3M → $55.9M) — almost entirely from S. Rivera jumping 92% → 102% attainment after closing 2 large deals; concentration risk if she misses next week.",
       "S. Rivera is the clear top performer at 102% attainment with the highest activity score.",
       "Negotiation→Closed Won conversion is strong at 71%; focus on accelerating Proposal→Negotiation (currently 58%).",
       "Recommended action: have managers run pipeline reviews on the 4 deals with >$1M and slipped close dates."

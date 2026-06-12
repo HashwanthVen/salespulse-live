@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>SALESPULSE LIVE · TERMINAL</title>
   <meta name="description" content="SalesPulse Live — Bloomberg-style sales pipeline command center for VPs of Sales, RevOps, and AEs. Synthetic data only." />
-  <link rel="stylesheet" href="styles.css?v=0.5.0" />
+  <link rel="stylesheet" href="styles.css?v=0.6.0" />
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to main content</a>
@@ -60,6 +60,25 @@
         <span class="chip good">▲ COVERAGE 3.1x</span>
         <span class="chip warn">● COMMIT GAP</span>
         <span class="chip info">↗ WIN RATE +1.6pts</span>
+      </div>
+    </section>
+
+    <!-- WHAT CHANGED SINCE LAST FORECAST -->
+    <section id="changed" class="panel" aria-labelledby="chg-title">
+      <div class="panel-head">
+        <span class="title" id="chg-title">WHAT CHANGED SINCE LAST FORECAST</span>
+        <span class="sub" id="chg-basis">SNAPSHOT DIFF</span>
+        <div class="right">
+          <span class="muted" style="font-size:10px;">Click a deal row to jump to TOP OPEN DEALS</span>
+        </div>
+      </div>
+      <div class="panel-body tight">
+        <div class="changed-grid">
+          <div class="change-card" id="chg-commit"  aria-label="Commit movement"></div>
+          <div class="change-card" id="chg-deals"   aria-label="Deal probability moves"></div>
+          <div class="change-card" id="chg-reps"    aria-label="Rep attainment moves"></div>
+          <div class="change-card" id="chg-risks"   aria-label="Risks added or resolved"></div>
+        </div>
       </div>
     </section>
 
@@ -297,6 +316,7 @@
       </div>
       <div class="panel-body">
         <ul class="rel-list">
+          <li><span class="ver">v0.6</span> <b>WHAT CHANGED SINCE LAST FORECAST</b> panel directly below the hero strip — WoW commit movement, deal-probability moves (click to jump), rep-attainment moves, risks added/resolved. Every KPI tile now also carries a small <i>vs Jun 5</i> whisper line so the basis of every number is unambiguous (§9.7 trust). Updated AI Insights to reference the commit-recovery story · closes #10</li>
           <li><span class="ver">v0.5</span> <b>SLIPPAGE THIS QUARTER</b> panel — slipped deals, $$ out of period, FROM → TO dates, reasons, with concentration footer (top owner / region / reason). Click any row to jump to that account in TOP OPEN DEALS with a brief highlight. Removed the redundant single-line slippage entry from DEAL RISK & ANOMALY (the new panel owns the story) · closes #8</li>
           <li><span class="ver">v0.4</span> FORECAST vs QUOTA: dashed <b>pace line</b> (linear $0 → quota across 13 weeks) + <b>PACE W8</b> / <b>vs PACE</b> stats so CROs can answer "are we ahead or behind pace?" in one glance — recomputes on COMMIT/BEST CASE toggle · closes #7</li>
           <li><span class="ver">v0.3</span> FORECAST vs QUOTA: confidence band around the COMMIT series (±7% TTM forecast accuracy) so CROs can defend the commit number on Friday calls · Mobile (≤720px): funnel conversion label now wraps under the bar so every stage — including Closed Won's "— win —" — renders consistently at 360px · closes #1 and #5</li>
@@ -317,7 +337,7 @@
     <span class="seg right"><span class="l">SYS</span> <span id="clock2">--:--:--</span></span>
   </div>
 
-  <script src="data.js?v=0.5.0"></script>
-  <script src="app.js?v=0.5.0"></script>
+  <script src="data.js?v=0.6.0"></script>
+  <script src="app.js?v=0.6.0"></script>
 </body>
 </html>

@@ -31,20 +31,152 @@
   }
 
   /* ---------- KPI ---------- */
+  // Whisper helper: maps a KPI label to the prior-snapshot key so each tile
+  // can show "vs <date>: <old> → <new>" — the basis line that addresses §9.7
+  // (trust & defensibility). Keeps the existing .k-note untouched.
+  const KPI_PRIOR_KEY = {
+    "Pipeline Value":    "pipelineValue",
+    "Weighted Pipeline": "weightedPipeline",
+    "Win Rate (TTM)":    "winRate",
+    "Avg Deal Size":     "avgDealSize",
+    "Sales Cycle":       "salesCycle",
+    "Pipeline Coverage": "coverage"
+  };
   function renderKpis() {
     const grid = $("kpi-grid");
     if (!grid) return;
+    const ps     = D.priorSnapshot || null;
+    const priorK = ps && ps.kpis || {};
     grid.innerHTML = D.kpis.map((k) => {
       const arrow = k.direction === "up" ? "▲" : k.direction === "down" ? "▼" : "▬";
+      const pk    = KPI_PRIOR_KEY[k.label];
+      const prior = pk ? priorK[pk] : null;
+      const whisper = (prior && ps && ps.asOf)
+        ? `<div class="k-whisper" title="Prior snapshot taken ${esc(ps.asOf)}">vs ${esc(ps.asOf)}: <b>${esc(prior)}</b> → <b>${esc(k.value)}</b></div>`
+        : "";
       return `
         <div class="kpi ${k.tone}">
           <div class="k-label"><span>${esc(k.label)}</span><span class="badge">LIVE</span></div>
           <div class="k-value">${esc(k.value)}</div>
           <div class="k-delta ${k.direction}">${arrow} ${esc(k.delta)}</div>
           <div class="k-note">${esc(k.note)}</div>
+          ${whisper}
         </div>`;
     }).join("");
     setText("kpi-stamp", "LAST UPD " + new Date().toISOString().slice(11, 19) + "Z");
+  }
+
+  /* ---------- WHAT CHANGED SINCE LAST FORECAST ---------- */
+  // 4-card panel that answers the CRO's hardest Friday question: "what changed
+  // since last week?" Renders commit movement, deal-probability moves, rep-
+  // attainment moves, and risks added/resolved. Deal rows reuse highlightDealRow.
+  function renderChanged() {
+    const ps = D.priorSnapshot;
+    if (!ps) return;
+    setText("chg-basis", "vs SNAPSHOT FROM " + ps.asOf);
+
+    const commit    = D.trend && D.trend.commit && D.trend.commit[D.trend.commit.length - 1];
+    const prior     = ps.commit;
+    const commitDiff = commit != null && prior != null ? +(commit - prior).toFixed(1) : 0;
+    const commitCls = commitDiff >= 0 ? "green" : "red";
+    const commitArr = commitDiff >= 0 ? "▲" : "▼";
+    const bestNow   = D.trend && D.trend.bestcase && D.trend.bestcase[D.trend.bestcase.length - 1];
+    const bestPrior = ps.bestcase;
+    const bestDiff  = bestNow != null && bestPrior != null ? +(bestNow - bestPrior).toFixed(1) : 0;
+    const bestCls   = bestDiff >= 0 ? "green" : "red";
+    const bestArr   = bestDiff >= 0 ? "▲" : "▼";
+
+    const commitEl = $("chg-commit");
+    if (commitEl) {
+      commitEl.innerHTML = `
+        <div class="card-title">COMMIT MOVEMENT</div>
+        <div class="card-big">
+          <b class="green">$${commit.toFixed(1)}M</b>
+          <span class="muted">←</span>
+          <b>$${prior.toFixed(1)}M</b>
+        </div>
+        <div class="card-row">
+          <span class="${commitCls}"><b>${commitArr} $${Math.abs(commitDiff).toFixed(1)}M</b></span>
+          <span class="muted">commit WoW</span>
+        </div>
+        <div class="card-row">
+          <span class="${bestCls}">${bestArr} $${Math.abs(bestDiff).toFixed(1)}M</span>
+          <span class="muted">best case ($${bestPrior.toFixed(1)}M → $${bestNow.toFixed(1)}M)</span>
+        </div>`;
+    }
+
+    const dealsEl = $("chg-deals");
+    if (dealsEl && Array.isArray(ps.dealProbDeltas)) {
+      const rows = ps.dealProbDeltas.slice(0, 4).map((d) => {
+        const diff   = d.newProb - d.oldProb;
+        const cls    = diff >= 0 ? "green" : "red";
+        const arr    = diff >= 0 ? "▲" : "▼";
+        return `
+          <li class="chg-row" data-account="${esc(d.account)}" tabindex="0" role="button"
+              title="Jump to ${esc(d.account)} in TOP OPEN DEALS">
+            <span class="chg-acct">${esc(d.account)}</span>
+            <span class="chg-mid"><b>${d.oldProb}%</b> → <b class="${cls}">${d.newProb}%</b> <span class="${cls}">${arr}${Math.abs(diff)}</span></span>
+            <span class="chg-amt num">$${formatK(d.amount)}</span>
+          </li>`;
+      }).join("");
+      dealsEl.innerHTML = `
+        <div class="card-title">DEAL PROBABILITY MOVES <span class="muted" style="font-weight:400;">(${ps.dealProbDeltas.length})</span></div>
+        <ul class="chg-list">${rows}</ul>`;
+      const ul = dealsEl.querySelector(".chg-list");
+      if (ul) {
+        const handler = (e) => {
+          const li = e.target.closest(".chg-row[data-account]");
+          if (!li) return;
+          if (e.type === "keydown" && e.key !== "Enter" && e.key !== " ") return;
+          e.preventDefault();
+          highlightDealRow(li.dataset.account);
+        };
+        ul.addEventListener("click", handler);
+        ul.addEventListener("keydown", handler);
+      }
+    }
+
+    const repsEl = $("chg-reps");
+    if (repsEl && Array.isArray(ps.repAttainDeltas)) {
+      const rows = ps.repAttainDeltas.slice(0, 3).map((r) => {
+        const diff = r.newAttain - r.oldAttain;
+        const cls  = diff >= 0 ? "green" : "red";
+        const arr  = diff >= 0 ? "▲" : "▼";
+        return `
+          <li class="chg-row">
+            <span class="chg-acct">${esc(r.name)}</span>
+            <span class="chg-mid"><b>${r.oldAttain}%</b> → <b class="${cls}">${r.newAttain}%</b> <span class="${cls}">${arr}${Math.abs(diff)}</span></span>
+          </li>`;
+      }).join("");
+      repsEl.innerHTML = `
+        <div class="card-title">REP ATTAINMENT MOVES</div>
+        <ul class="chg-list">${rows}</ul>`;
+    }
+
+    const risksEl = $("chg-risks");
+    if (risksEl) {
+      const nNew    = (ps.newRisks    || []).length;
+      const nClosed = (ps.closedRisks || []).length;
+      const newList = (ps.newRisks    || []).map((t) => `<li class="risk-new">✚ ${esc(t)}</li>`).join("");
+      const cloList = (ps.closedRisks || []).map((t) => `<li class="risk-closed">✔ ${esc(t)}</li>`).join("");
+      risksEl.innerHTML = `
+        <div class="card-title">RISKS CHANGED</div>
+        <div class="card-row card-row-spaced">
+          <span class="red"><b>✚ ${nNew}</b> NEW</span>
+          <span class="green"><b>✔ ${nClosed}</b> RESOLVED</span>
+        </div>
+        <button class="btn sm chg-risk-toggle" type="button" aria-expanded="false">SHOW LIST</button>
+        <ul class="chg-risk-list" hidden>${newList}${cloList}</ul>`;
+      const tog = risksEl.querySelector(".chg-risk-toggle");
+      const lst = risksEl.querySelector(".chg-risk-list");
+      if (tog && lst) {
+        tog.addEventListener("click", () => {
+          const open = lst.hasAttribute("hidden");
+          if (open) { lst.removeAttribute("hidden"); tog.textContent = "HIDE LIST"; tog.setAttribute("aria-expanded","true"); }
+          else      { lst.setAttribute("hidden",""); tog.textContent = "SHOW LIST"; tog.setAttribute("aria-expanded","false"); }
+        });
+      }
+    }
   }
 
   /* ---------- FUNNEL ---------- */
@@ -565,7 +697,7 @@
   }
   function runCommand(cmd) {
     if (cmd === "HELP") {
-      flash("CMDS: GO DASH | GO FUNNEL | GO FORECAST | GO DEALS | GO REPS | GO SLIP | GO RISKS | GO AUD | FILTER NA/EMEA/APAC | FCST COMMIT/BEST | ROTATE");
+      flash("CMDS: GO DASH | GO CHG | GO FUNNEL | GO FORECAST | GO DEALS | GO REPS | GO SLIP | GO RISKS | GO AUD | FILTER NA/EMEA/APAC | FCST COMMIT/BEST | ROTATE");
       return;
     }
     const goMap = {
@@ -573,6 +705,7 @@
       "GO FORECAST": "forecast", "GO FCST": "forecast", "GO DEALS": "deals",
       "GO REPS": "reps", "GO SEG": "segments", "GO SEGMENTS": "segments",
       "GO RISKS": "risks", "GO SLIP": "slippage", "GO SLIPPAGE": "slippage",
+      "GO CHG": "changed", "GO CHANGED": "changed",
       "GO AUD": "audience", "GO AUDIENCE": "audience",
       "GO NOTES": "release"
     };
@@ -620,6 +753,7 @@
     renderTicker();
     tickClock(); setInterval(tickClock, 1000);
     renderKpis();
+    renderChanged();
     renderFunnel();
     renderChart(currentSeries);
     bindToggle();

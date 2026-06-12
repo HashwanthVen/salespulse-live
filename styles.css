@@ -238,6 +238,58 @@ main { padding: 10px 12px 50px; max-width: 1600px; margin: 0 auto; }
 .kpi .k-delta.down { color: var(--red); }
 .kpi .k-delta.flat { color: var(--dim); }
 .kpi .k-note { color: var(--dim); font-size: 11px; margin-top: 4px; }
+.kpi .k-whisper {
+  color: var(--dimmer); font-size: 10px; margin-top: 3px;
+  padding-top: 3px; border-top: 1px dashed var(--border);
+  font-variant-numeric: tabular-nums;
+}
+.kpi .k-whisper b { color: var(--dim); font-weight: 700; }
+
+/* WHAT CHANGED SINCE LAST FORECAST — 4-card grid (stacks ≤720px).
+   Card style is minimal (no rounded corners / shadows) to fit the
+   terminal aesthetic. Lists inside cards are dense, tabular. */
+.changed-grid {
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  gap: 1px; background: var(--border);
+}
+.change-card {
+  background: var(--panel); padding: 10px 12px;
+  display: flex; flex-direction: column; gap: 6px;
+  min-width: 0;
+}
+.change-card .card-title {
+  color: var(--green); font-size: 10px; font-weight: 700;
+  letter-spacing: 1.5px; text-transform: uppercase;
+}
+.change-card .card-big {
+  display: flex; gap: 6px; align-items: baseline; flex-wrap: wrap;
+  font-size: 16px; color: var(--white); font-variant-numeric: tabular-nums;
+}
+.change-card .card-row {
+  display: flex; gap: 6px; align-items: center; font-size: 11px; flex-wrap: wrap;
+}
+.change-card .card-row-spaced { justify-content: space-between; }
+.chg-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 2px; }
+.chg-row {
+  display: grid; grid-template-columns: 1fr auto;
+  gap: 4px 8px; align-items: baseline;
+  padding: 4px 6px; font-size: 11px;
+  border-bottom: 1px dashed var(--border);
+  font-variant-numeric: tabular-nums;
+}
+.chg-row:last-child { border-bottom: none; }
+.chg-row[data-account] { cursor: pointer; }
+.chg-row[data-account]:hover  { background: var(--bg-2); }
+.chg-row[data-account]:focus  { outline: 1px solid var(--green); outline-offset: -1px; }
+.chg-row .chg-acct { color: var(--white); font-weight: 700; grid-column: 1; }
+.chg-row .chg-mid  { grid-column: 1 / -1; color: var(--dim); font-size: 10px; }
+.chg-row .chg-amt  { grid-column: 2; grid-row: 1; color: var(--green); font-weight: 700; }
+.chg-risk-toggle { align-self: flex-start; }
+.chg-risk-list { list-style: none; padding: 4px 0 0; margin: 0; font-size: 11px; }
+.chg-risk-list li { padding: 3px 0; border-bottom: 1px dashed var(--border); }
+.chg-risk-list li:last-child { border-bottom: none; }
+.chg-risk-list .risk-new    { color: var(--red); }
+.chg-risk-list .risk-closed { color: var(--green); }
 
 /* CHART (SVG line) */
 .chart-wrap { position: relative; height: 240px; padding: 6px 6px 0; }
@@ -593,4 +645,7 @@ select option { background: var(--bg); color: var(--white); }
   /* Chart stat: keep horizontal but allow wrap and shrink so PACE + vs PACE
      don't collide with the toggle group above. */
   .chart-stat { gap: 8px 12px; font-size: 10px; top: 4px; right: 8px; }
+  /* WHAT CHANGED panel: stack 4 cards into 1 column on mobile. */
+  .changed-grid { grid-template-columns: 1fr; }
+  .change-card .card-big { font-size: 14px; }
 }
