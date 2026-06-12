@@ -149,12 +149,18 @@ window.SALESPULSE_DATA = {
 
   /* Rep leaderboard */
   reps: [
-    { name: "S. Rivera",   region: "NA",   quota: 4200000, attain: 102, pipeline: 8400000, won: 12, activity: 94 },
-    { name: "L. Patel",    region: "EMEA", quota: 3800000, attain:  88, pipeline: 7100000, won:  9, activity: 87 },
-    { name: "M. Chen",     region: "APAC", quota: 3600000, attain:  76, pipeline: 6400000, won:  8, activity: 81 },
-    { name: "J. Okafor",   region: "NA",   quota: 3400000, attain:  64, pipeline: 5800000, won:  7, activity: 72 },
-    { name: "K. Yamada",   region: "APAC", quota: 3200000, attain:  58, pipeline: 4900000, won:  6, activity: 68 },
-    { name: "E. Sokolova", region: "EMEA", quota: 3000000, attain:  41, pipeline: 3700000, won:  4, activity: 55 }
+    { name: "S. Rivera",   region: "NA",   quota: 4200000, attain: 102, pipeline: 8400000, won: 12, activity: 94,
+      forecastHistory: { accuracy: 88, bias: "reliable",   last4Q: [ +2,  -3,  +4,  -1] } },
+    { name: "L. Patel",    region: "EMEA", quota: 3800000, attain:  88, pipeline: 7100000, won:  9, activity: 87,
+      forecastHistory: { accuracy: 84, bias: "reliable",   last4Q: [ -2,  +5,  -1,  +3] } },
+    { name: "M. Chen",     region: "APAC", quota: 3600000, attain:  76, pipeline: 6400000, won:  8, activity: 81,
+      forecastHistory: { accuracy: 72, bias: "over-commit",last4Q: [ -8, -12,  -9,  -7] } },
+    { name: "J. Okafor",   region: "NA",   quota: 3400000, attain:  64, pipeline: 5800000, won:  7, activity: 72,
+      forecastHistory: { accuracy: 76, bias: "reliable",   last4Q: [ +4,  -3,  +6,  -2] } },
+    { name: "K. Yamada",   region: "APAC", quota: 3200000, attain:  58, pipeline: 4900000, won:  6, activity: 68,
+      forecastHistory: { accuracy: 64, bias: "over-commit",last4Q: [-15, -18, -11, -14] } },
+    { name: "E. Sokolova", region: "EMEA", quota: 3000000, attain:  41, pipeline: 3700000, won:  4, activity: 55,
+      forecastHistory: { accuracy: 68, bias: "sandbag",    last4Q: [+22, +18, +25, +19] } }
   ],
 
   /* Pipeline by Segment */
@@ -240,6 +246,7 @@ window.SALESPULSE_DATA = {
       "Q3 coverage is 2.0x vs the 3.0x target — $61.6M of unweighted pipe short with 18 weeks to Q3 start. At the current $13.5M/wk pipegen run-rate from #12 that's a 4.5-week sprint of perfect pipegen — feasible but unforgiving. Action: brief CMO + SDR leadership this week on outbound + inbound campaign acceleration; cross-reference PIPELINE CREATED panel.",
       "4 of the top-12 deals are un-defensible heading into Friday call: Northwind + Fabrikam have NO next step logged, Lucerne is 7d overdue on Legal redline, Margie's is 3d overdue on renewal terms — $4.8M weighted in commit. Manager-led pipe review on these before EOD.",
       "Momentum is DOWN on 4 of the top-12 deals (Northwind, Fabrikam, Lucerne, Litware) — combined $3.1M weighted. Prob and close date haven't moved yet, but engagement has — these are the deals most likely to slip next. Assign manager-led pipe reviews this week.",
+      "Forecast reliability: 74% of committed $$ is from RELIABLE forecasters (Rivera/Patel/Okafor). K. Yamada has missed commit by 11–18% for 4 quarters straight — currently calling ~$2.4M; historical bias suggests true landing is closer to $2.0M. E. Sokolova consistently SANDBAGS by 18–25% — $1.2M of upside hidden in her best-case. Net read: discount Yamada's commit, treat Sokolova's best as commit-eligible.",
       "Activity score for E. Sokolova (55) is below threshold — coaching candidate.",
       "Recommended action: re-balance territory coverage in EMEA Mid-Market."
     ],
@@ -285,6 +292,7 @@ window.SALESPULSE_DATA = {
     { sym: "PIPEGEN",  val: "17.1M",   chg: "+8.6M NET" },
     { sym: "Q3COV",    val: "2.0x",    chg: "▼ under-covered" },
     { sym: "Q4COV",    val: "1.0x",    chg: "▼ thin" },
+    { sym: "RELY",     val: "74%",     chg: "COMMIT $ FROM RELIABLE" },
     { sym: "RIVERA",   val: "102%",    chg: "+2%" },
     { sym: "PATEL",    val: "88%",     chg: "+5%" },
     { sym: "CHEN",     val: "76%",     chg: "+3%" },

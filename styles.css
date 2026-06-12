@@ -1022,3 +1022,29 @@ select option { background: var(--bg); color: var(--white); }
   .fc-action { font-size: 10px; }
   .fc-bar-wrap { height: auto; }
 }
+
+/* FORECAST RELIABILITY (#19) — bias chip + 4Q sparkline on REP LEADERBOARD. */
+.bias-chip {
+  display: inline-block; padding: 1px 6px; font-family: var(--mono);
+  font-size: 10px; font-weight: 700; letter-spacing: 1px;
+  border: 1px solid currentColor; background: transparent;
+  vertical-align: middle;
+}
+.bias-chip.green { color: var(--green); }
+.bias-chip.amber { color: var(--amber); }
+.bias-chip.red   { color: var(--red); }
+.bias-chip.muted { color: var(--dim); border-color: var(--border-2); }
+.bias-chip.bias-mini { font-size: 9px; padding: 0 4px; margin-left: 4px; letter-spacing: 0.5px; }
+.fcst-spark { display: inline-flex; gap: 3px; margin-left: 6px; vertical-align: middle; }
+.fcst-dot {
+  display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+  vertical-align: middle; opacity: 0.85;
+}
+.fcst-dot.green { background: var(--green); }
+.fcst-dot.amber { background: var(--amber); }
+.fcst-dot.red   { background: var(--red); }
+@media (max-width: 720px) {
+  /* Mobile: collapse FCST ACC + sparkline; keep BIAS chip only. */
+  .data-table th:nth-child(8), .data-table td:nth-child(8) { display: none; }
+  .fcst-spark { display: none; }
+}

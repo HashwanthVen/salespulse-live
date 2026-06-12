@@ -268,13 +268,20 @@
 
     const repsEl = $("chg-reps");
     if (repsEl && Array.isArray(ps.repAttainDeltas)) {
+      const repByName = {};
+      (D.reps || []).forEach((rp) => { repByName[rp.name] = rp; });
       const rows = ps.repAttainDeltas.slice(0, 3).map((r) => {
         const diff = r.newAttain - r.oldAttain;
         const cls  = diff >= 0 ? "green" : "red";
         const arr  = diff >= 0 ? "▲" : "▼";
+        const rp   = repByName[r.name];
+        const bm   = rp && rp.forecastHistory ? biasMeta(rp.forecastHistory.bias) : null;
+        const biasChip = bm
+          ? ` <span class="bias-chip bias-mini ${bm.cls}" title="Forecast bias from REPS · ${bm.label}">${bm.short}</span>`
+          : "";
         return `
           <li class="chg-row">
-            <span class="chg-acct">${esc(r.name)}</span>
+            <span class="chg-acct">${esc(r.name)}${biasChip}</span>
             <span class="chg-mid"><b>${r.oldAttain}%</b> → <b class="${cls}">${r.newAttain}%</b> <span class="${cls}">${arr}${Math.abs(diff)}</span></span>
           </li>`;
       }).join("");
@@ -413,6 +420,11 @@
        All inputs are real fields on data.js → trend / slippage / meta. */
     const BEST_TO_COMMIT = 0.40;
     const SLIP_RECUR     = 0.30;
+    // TODO: weight projection by D.reps[].forecastHistory once #19 reliability
+    // is established as stable (#17 + #19 cross-issue). Today the projection
+    // treats every rep's commit identically; weighting by rep reliability
+    // (sandbag → keep best-case in projection, over-commit → discount commit)
+    // would materially sharpen the Q-end midpoint.
     const commitLast = commitVals[commitVals.length - 1];
     const bestLast   = bestVals[bestVals.length - 1];
     const valuesLast = values[values.length - 1];
@@ -587,9 +599,30 @@
       const motionPart = motionOn
         ? ` Showing ${MOTION_LABEL[currentMotion]} contribution to the unchanged company quota.`
         : "";
+      // Reliability whisper (#19): share of commit from reliable forecasters,
+      // and a $$ over-commit / sandbag estimate from historical bias.
+      let relyPart = "";
+      const reps = D.reps || [];
+      if (reps.length && reps.some((r) => r.forecastHistory)) {
+        const totalP = reps.reduce((s, r) => s + (r.pipeline || 0), 0);
+        const relyP  = reps.filter((r) => r.forecastHistory && r.forecastHistory.bias === "reliable").reduce((s, r) => s + (r.pipeline || 0), 0);
+        const relyPct = totalP > 0 ? Math.round((relyP / totalP) * 100) : 0;
+        // historical mean miss (negative) and mean sandbag (positive) per bias
+        const meanMiss = (bias) => {
+          const xs = reps.filter((r) => r.forecastHistory && r.forecastHistory.bias === bias)
+            .flatMap((r) => r.forecastHistory.last4Q || []);
+          if (!xs.length) return 0;
+          return xs.reduce((s, x) => s + x, 0) / xs.length;
+        };
+        const overShare = reps.filter((r) => r.forecastHistory && r.forecastHistory.bias === "over-commit").reduce((s, r) => s + (r.pipeline || 0), 0);
+        const sandShare = reps.filter((r) => r.forecastHistory && r.forecastHistory.bias === "sandbag").reduce((s, r) => s + (r.pipeline || 0), 0);
+        const overRisk  = Math.abs(meanMiss("over-commit") / 100) * commitLast * (overShare / Math.max(totalP, 1));
+        const sandUp    = (meanMiss("sandbag") / 100) * commitLast * (sandShare / Math.max(totalP, 1));
+        relyPart = ` Reliability: ${relyPct}% of commit from RELIABLE forecasters; over-committer risk ≈ $${overRisk.toFixed(1)}M may not land, sandbag upside ≈ $${sandUp.toFixed(1)}M may exceed commit.`;
+      }
       cap.textContent = (showBand
         ? `Confidence band: ±${(acc * 100).toFixed(0)}% based on TTM forecast accuracy · ${pacePart}`
-        : pacePart) + projPart + motionPart;
+        : pacePart) + projPart + motionPart + relyPart;
     }
     // Refresh hero strip to incorporate the projection.
     renderHeroSummary({ commit: commitLast, best: bestLast, quota: target, projCommit: projCommitMid, projBand: acc });
@@ -1227,12 +1260,40 @@
   }
 
   /* ---------- REPS ---------- */
+  // FORECAST RELIABILITY (#19): per-rep forecast accuracy + bias chip + 4Q sparkline.
+  // Bias values: "reliable" | "sandbag" | "over-commit". last4Q values are
+  // (actual − commit) / commit × 100 per quarter (neg = over-committed; pos = sandbagged).
+  function biasMeta(b) {
+    if (b === "reliable")    return { label: "RELIABLE", cls: "green", short: "RELY" };
+    if (b === "sandbag")     return { label: "SANDBAG",  cls: "amber", short: "SAND" };
+    if (b === "over-commit") return { label: "OVER",     cls: "red",   short: "OVER" };
+    return { label: "—", cls: "muted", short: "—" };
+  }
+  function fcstAccCls(a) {
+    if (a >= 80) return "green";
+    if (a >= 65) return "amber";
+    return "red";
+  }
   function renderReps() {
     const tbody = $("reps-tbody");
     if (!tbody) return;
     tbody.innerHTML = D.reps.map((r) => {
       const attainCls = r.attain >= 90 ? "" : r.attain >= 70 ? "warn" : "bad";
       const actCls    = r.activity >= 80 ? "green" : r.activity >= 65 ? "amber" : "red";
+      const fh        = r.forecastHistory || null;
+      const accCell   = fh
+        ? `<td class="num ${fcstAccCls(fh.accuracy)}" title="Last 4Q forecast accuracy">${fh.accuracy}%</td>`
+        : `<td class="num muted">—</td>`;
+      let biasCell = `<td class="muted">—</td>`;
+      if (fh) {
+        const bm  = biasMeta(fh.bias);
+        const tip = "Last 4Q (actual − commit) / commit: " + (fh.last4Q || []).map((q) => (q >= 0 ? "+" : "") + q).join("  ");
+        const dots = (fh.last4Q || []).map((q) => {
+          const dc = q >= 5 ? "amber" : q <= -5 ? "red" : "green";
+          return `<i class="fcst-dot ${dc}" title="${(q >= 0 ? "+" : "")}${q}%"></i>`;
+        }).join("");
+        biasCell = `<td><span class="bias-chip ${bm.cls}" title="${esc(tip)}">${bm.label}</span><span class="fcst-spark" aria-hidden="true">${dots}</span></td>`;
+      }
       return `
         <tr>
           <td><b class="green">${esc(r.name)}</b></td>
@@ -1245,8 +1306,21 @@
           <td class="num">$${formatK(r.pipeline)}</td>
           <td class="num">${r.won}</td>
           <td class="num ${actCls}">${r.activity}</td>
+          ${accCell}
+          ${biasCell}
         </tr>`;
     }).join("");
+
+    // Reliability rollup: share of pipeline-weighted commit from RELIABLE reps.
+    const relyEl = $("reps-rely");
+    if (relyEl) {
+      const totalPipe = D.reps.reduce((s, r) => s + (r.pipeline || 0), 0);
+      const relyPipe  = D.reps.filter((r) => r.forecastHistory && r.forecastHistory.bias === "reliable").reduce((s, r) => s + (r.pipeline || 0), 0);
+      const nSand     = D.reps.filter((r) => r.forecastHistory && r.forecastHistory.bias === "sandbag").length;
+      const nOver     = D.reps.filter((r) => r.forecastHistory && r.forecastHistory.bias === "over-commit").length;
+      const pct       = totalPipe > 0 ? Math.round((relyPipe / totalPipe) * 100) : 0;
+      relyEl.innerHTML = `RELIABILITY: <b>${pct}%</b> of commit from RELIABLE forecasters · <b class="amber">${nSand}</b> sandbag · <b class="red">${nOver}</b> over-commit`;
+    }
   }
 
   /* ---------- SEGMENTS ---------- */
