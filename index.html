@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>SALESPULSE LIVE · TERMINAL</title>
   <meta name="description" content="SalesPulse Live — Bloomberg-style sales pipeline command center for VPs of Sales, RevOps, and AEs. Synthetic data only." />
-  <link rel="stylesheet" href="styles.css?v=0.14.0" />
+  <link rel="stylesheet" href="styles.css?v=0.15.0" />
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to main content</a>
@@ -261,6 +261,19 @@
     </section>
 
     <!-- REPS + SEGMENTS row -->
+    <!-- AT-RISK REPS coaching list (#21) — saves Sales Mgr 30 min of pre-1:1 prep -->
+    <section id="at-risk-reps" class="panel" aria-labelledby="ar-title">
+      <div class="panel-head">
+        <span class="title" id="ar-title">AT-RISK REPS</span>
+        <span class="sub">COACHING LIST · AUTO-DERIVED</span>
+        <span class="right muted" id="ar-stat" style="font-size:10px;"></span>
+      </div>
+      <div class="panel-body tight">
+        <div class="ar-list" id="ar-list" aria-live="polite"></div>
+        <div class="ar-caption" id="ar-caption"></div>
+      </div>
+    </section>
+
     <div class="row-grid cols-2">
       <section id="reps" class="panel" aria-labelledby="reps-title">
         <div class="panel-head">
@@ -378,6 +391,7 @@
       </div>
       <div class="panel-body">
         <ul class="rel-list">
+          <li><span class="ver">v0.15</span> <b>AT-RISK REPS — auto-derived coaching list</b> — saves Sales Mgrs ~30 min of pre-1:1 prep. New panel above REPS+SEGMENTS row surfaces every rep who trips any of 6 watchlist rules: <i>attain &lt; 70 · activity &lt; 65 · over-commit + behind · top deal missing next step · cold top deal (engagement &lt; 40) · WoW attain ≤ −3pts</i>. Each row shows the rep + region + bias chip, the highest-severity reason chip (RED if 2+ rules, AMBER if 1), an auto-generated one-line rationale that combines all triggered rules, and a suggested action chip (<b>PIPE REVIEW · 1:1 COACH · RAMP CHECK · DEAL INSPECT</b>). Panel header rollup: <i>N reps at risk · N need 1:1 this week</i> (or <i>ALL REPS ON TRACK</i> in green). Each row is clickable — scrolls to the REP LEADERBOARD and pulses that rep. TOP-3 CONCENTRATION tooltip now appends top-3 owners and flags any owner who's on the coaching list — concentration + rep risk now visibly compound. New <b>RISKREP</b> ticker symbol + new AI insight bullet quantifies which 5 of 6 reps are flagged + how concentration risk overlaps. New commands <b>GO COACH / GO RISK / GO ATRISK</b>. Mobile: each row's rationale wraps under the rep name; action chip remains visible · closes #21</li>
           <li><span class="ver">v0.14</span> <b>REP LEADERBOARD: FCST ACC + BIAS columns (last 4Q) + reliability rollup</b> — answers the CRO's #1 Friday-call question (<i>"whose forecast can I actually trust?"</i>) before commit gets rolled up. Two new right-aligned columns: <b>FCST ACC</b> shows last-4Q rep forecast accuracy %, tone-colored green ≥ 80 / amber 65–79 / red &lt; 65. <b>BIAS</b> chip flags <i>RELIABLE</i> (green), <i>SANDBAG</i> (amber), or <i>OVER</i> (red) with a hover tooltip surfacing the actual last-4Q (actual−commit)/commit values + a 4-dot sparkline of the same. Panel header gains a <b>RELIABILITY</b> rollup: % of pipeline-weighted commit from RELIABLE forecasters + counts of sandbaggers / over-committers. FORECAST vs QUOTA chart caption appends a reliability whisper estimating $$ over-commit risk and $$ sandbag upside hidden in the current commit. WHAT CHANGED SINCE LAST FORECAST cross-references with a <b>RELY/SAND/OVER</b> mini-chip next to each moving rep — so a +10pt jump from a SANDBAGGER reads differently than the same jump from an OVER-COMMITTER. New <b>RELY</b> ticker · new AI insight bullet quantifies Yamada's likely $0.4M overstatement + Sokolova's $1.2M hidden upside. PROJECTED Q-END comment now flags the future weight-by-reliability follow-up · closes #19</li>
           <li><span class="ver">v0.13</span> <b>NEXT-QUARTER COVERAGE panel</b> — surfaces the board+CFO conversation that's invisible today. New 3-column panel renders open pipe by close-date quarter for Q2 (current) / Q3 / Q4: big tone-colored coverage ratio (green ≥ 3x · amber 0.7–1.0× · red < 0.7×) vs the 3.0x target, weighted/unweighted/deal-count secondaries, and a <i>NEED $XM MORE PIPE TO HIT 3x</i> action row computed at render. Shared horizontal-bar viz beneath the columns shows unweighted-pipe-to-target visually, with a dashed 3x marker. Q2 reconciles exactly with existing Weighted Pipeline + Coverage KPIs — renders a <i>⚠ MISMATCH</i> warning if they drift. New <b>Q3COV / Q4COV</b> ticker symbols + AI insight bullet cross-references the PIPELINE CREATED panel. <b>GO COV / GO COVERAGE</b> commands. Story this quarter: <i>Q3 is 2.0x — alarm bell · need $61.6M more unweighted in 18 weeks</i> · closes #16</li>
           <li><span class="ver">v0.12</span> <b>FORECAST vs QUOTA: W9-W13 dashed projection + PROJECTED Q-END mini-stat</b> — answers the Friday CRO question ("what will we land at?") in one glance. Chart now spans the full quarter; W1-W8 actuals stay solid, W9-W13 renders as a dashed continuation with a translucent extended confidence band and a "NOW" marker at the W8 boundary. New PROJECTED Q-END stat block beside the existing stats: big tone-colored projection $$, range (±7% TTM accuracy), gap vs quota, and "BEST CASE →" sub-stat — methodology tooltip explains the transparent formula (commit + (bestcase−commit) × 40% − slippage drag at 30% recurrence). Hero strip rewrites every render to incorporate the projection. New PROJ ticker symbol + AI insight bullet ties the projection to a recommended Wednesday action · closes #17</li>
@@ -407,7 +421,7 @@
     <span class="seg right"><span class="l">SYS</span> <span id="clock2">--:--:--</span></span>
   </div>
 
-  <script src="data.js?v=0.14.0"></script>
-  <script src="app.js?v=0.14.0"></script>
+  <script src="data.js?v=0.15.0"></script>
+  <script src="app.js?v=0.15.0"></script>
 </body>
 </html>

@@ -247,6 +247,7 @@ window.SALESPULSE_DATA = {
       "4 of the top-12 deals are un-defensible heading into Friday call: Northwind + Fabrikam have NO next step logged, Lucerne is 7d overdue on Legal redline, Margie's is 3d overdue on renewal terms — $4.8M weighted in commit. Manager-led pipe review on these before EOD.",
       "Momentum is DOWN on 4 of the top-12 deals (Northwind, Fabrikam, Lucerne, Litware) — combined $3.1M weighted. Prob and close date haven't moved yet, but engagement has — these are the deals most likely to slip next. Assign manager-led pipe reviews this week.",
       "Forecast reliability: 74% of committed $$ is from RELIABLE forecasters (Rivera/Patel/Okafor). K. Yamada has missed commit by 11–18% for 4 quarters straight — currently calling ~$2.4M; historical bias suggests true landing is closer to $2.0M. E. Sokolova consistently SANDBAGS by 18–25% — $1.2M of upside hidden in her best-case. Net read: discount Yamada's commit, treat Sokolova's best as commit-eligible.",
+      "AT-RISK REPS coaching list: 5 of 6 reps trigger at least one watchlist rule this week. Sokolova (41% + activity 55), Yamada (58% + chronic over-commit), Chen (76% + cold Fabrikam deal + WoW −6pts), Okafor (64%), Rivera (top deal Northwind has no next step). Top-3 concentration deals are owned by 3 of these 5 reps — concentration risk compounds with rep risk. Action: open AT-RISK REPS panel before today's 1:1 prep — 30 minutes of pre-work already done.",
       "Activity score for E. Sokolova (55) is below threshold — coaching candidate.",
       "Recommended action: re-balance territory coverage in EMEA Mid-Market."
     ],
@@ -293,6 +294,7 @@ window.SALESPULSE_DATA = {
     { sym: "Q3COV",    val: "2.0x",    chg: "▼ under-covered" },
     { sym: "Q4COV",    val: "1.0x",    chg: "▼ thin" },
     { sym: "RELY",     val: "74%",     chg: "COMMIT $ FROM RELIABLE" },
+    { sym: "RISKREP",  val: "5/6",     chg: "▼ ON COACHING LIST" },
     { sym: "RIVERA",   val: "102%",    chg: "+2%" },
     { sym: "PATEL",    val: "88%",     chg: "+5%" },
     { sym: "CHEN",     val: "76%",     chg: "+3%" },

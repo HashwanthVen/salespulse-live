@@ -156,7 +156,23 @@
       : "";
     const tooltip = "If top 3 slip: " + s.top3.map((d) =>
       `${d.account} ($${(d.amount/1e6).toFixed(2)}M × ${d.prob}% = $${((d.amount*d.prob/100)/1e6).toFixed(2)}M weighted)`
-    ).join(" · ") + nsLine;
+    ).join(" · ") + nsLine + (function () {
+      // Top-3 owners + watchlist cross-flag (#21): if any of the top-3 owners
+      // is currently on the AT-RISK REPS coaching list, concentration risk
+      // visibly compounds with rep risk.
+      try {
+        const owners = [...new Set(s.top3.map((d) => d.owner).filter(Boolean))];
+        if (!owners.length) return "";
+        const wl = (typeof computeAtRiskReps === "function") ? computeAtRiskReps() : [];
+        const wlNames = new Set(wl.map((w) => w.rep && w.rep.name).filter(Boolean));
+        const flaggedOwners = owners.filter((o) => wlNames.has(o));
+        let line = " · Top-3 deals owned by: " + owners.join(", ");
+        if (flaggedOwners.length) {
+          line += ` (${flaggedOwners.length} on coaching list: ${flaggedOwners.join(", ")})`;
+        }
+        return line;
+      } catch (e) { return ""; }
+    })();
     return `
       <div class="kpi ${s.tone} kpi-clickable" id="kpi-conc" role="button" tabindex="0"
            data-accounts="${esc(s.top3.map((d) => d.account).join("|"))}"
@@ -1323,6 +1339,140 @@
     }
   }
 
+  /* ---------- AT-RISK REPS — coaching list (#21) ----------
+     Auto-derived watchlist from existing rep + topDeals + priorSnapshot data.
+     A rep enters the watchlist if ANY of:
+       1) attain < 70
+       2) activity < 65
+       3) forecastHistory.bias == "over-commit" AND attain < 90
+       4) >=1 of their top-12 deals has nextStep == null (missing)
+       5) >=1 of their top-12 deals has engagement.score < 40 (cold)
+       6) WoW attainment delta from priorSnapshot.repAttainDeltas <= -3
+     Primary reason picked by severity ordering:
+       missing next step > over-commit+behind > below 70% > cold deals > low activity > WoW drop.
+     Action chip: PIPE REVIEW / 1:1 COACH / RAMP CHECK / DEAL INSPECT — picked by primary reason. */
+  function computeAtRiskReps() {
+    if (!Array.isArray(D.reps) || !Array.isArray(D.topDeals)) return [];
+    const wowByName = {};
+    ((D.priorSnapshot && D.priorSnapshot.repAttainDeltas) || []).forEach((r) => {
+      wowByName[r.name] = (r.newAttain || 0) - (r.oldAttain || 0);
+    });
+    const dealsByOwner = {};
+    D.topDeals.forEach((d) => {
+      (dealsByOwner[d.owner] = dealsByOwner[d.owner] || []).push(d);
+    });
+    const out = [];
+    D.reps.forEach((r) => {
+      const triggered = [];
+      const deals = dealsByOwner[r.name] || [];
+      const missingNs = deals.filter((d) => !d.nextStep);
+      const coldDeals = deals.filter((d) => d.engagement && d.engagement.score < 40);
+      const bias      = r.forecastHistory && r.forecastHistory.bias;
+      const wow       = wowByName[r.name];
+
+      if (missingNs.length > 0)
+        triggered.push({ kind: "missingNs", sev: 6, text: `${missingNs.length} top deal${missingNs.length>1?"s":""} missing next step`, action: "PIPE REVIEW" });
+      if (bias === "over-commit" && r.attain < 90)
+        triggered.push({ kind: "overBehind", sev: 5, text: `chronic over-commit · attain ${r.attain}%`, action: "DEAL INSPECT" });
+      if (r.attain < 70)
+        triggered.push({ kind: "lowAttain", sev: 4, text: `attain ${r.attain}%`, action: "1:1 COACH" });
+      if (coldDeals.length > 0)
+        triggered.push({ kind: "cold", sev: 3, text: `${coldDeals.length} cold top deal${coldDeals.length>1?"s":""}`, action: "PIPE REVIEW" });
+      if (r.activity < 65)
+        triggered.push({ kind: "lowAct", sev: 2, text: `activity ${r.activity}`, action: "RAMP CHECK" });
+      if (typeof wow === "number" && wow <= -3)
+        triggered.push({ kind: "wowDrop", sev: 1, text: `WoW ${wow}pts`, action: "1:1 COACH" });
+
+      if (!triggered.length) return;
+      triggered.sort((a, b) => b.sev - a.sev);
+      const primary = triggered[0];
+      const tone = triggered.length >= 2 ? "red" : "amber";
+      // Rationale: primary reason + the most-actionable extras, capped ~80 chars.
+      const extras = triggered.slice(1).map((t) => t.text);
+      let rationale = `${primary.text}${extras.length ? " · " + extras.join(" · ") : ""}`;
+      if (rationale.length > 90) rationale = rationale.slice(0, 87) + "…";
+      out.push({
+        rep: r,
+        triggered,
+        primary,
+        tone,
+        action: primary.action,
+        rationale,
+        // 1:1 = behind on quota or wow drop, not just deal-hygiene
+        needs11: triggered.some((t) => t.kind === "lowAttain" || t.kind === "wowDrop" || t.kind === "overBehind")
+      });
+    });
+    // Sort: red before amber, then by severity of primary reason desc.
+    out.sort((a, b) => (a.tone === b.tone ? b.primary.sev - a.primary.sev : (a.tone === "red" ? -1 : 1)));
+    return out;
+  }
+  function renderAtRiskReps() {
+    const list = $("ar-list");
+    const stat = $("ar-stat");
+    const cap  = $("ar-caption");
+    if (!list) return;
+    const wl = computeAtRiskReps();
+    if (!wl.length) {
+      if (stat) stat.innerHTML = `<b class="green">ALL REPS ON TRACK — TEAM HEALTHY</b>`;
+      list.innerHTML = `<div class="ar-empty">No reps on the watchlist this week. ✓</div>`;
+      if (cap) cap.textContent = "Watchlist criteria: attain < 70 · activity < 65 · over-commit bias + attain < 90 · top deal missing next step · cold top deal (engagement < 40) · WoW attain ≤ −3pts.";
+      return;
+    }
+    const n11 = wl.filter((w) => w.needs11).length;
+    if (stat) stat.innerHTML = `<b class="red">${wl.length}</b> reps at risk · <b class="amber">${n11}</b> need 1:1 this week`;
+    list.innerHTML = wl.map((w) => {
+      const region = esc(w.rep.region);
+      const name   = esc(w.rep.name);
+      // Bias chip if available — reuses #19 styling
+      const fh = w.rep.forecastHistory;
+      const bm = fh ? biasMeta(fh.bias) : null;
+      const biasChip = bm
+        ? `<span class="bias-chip bias-mini ${bm.cls}">${bm.short}</span>`
+        : "";
+      const primaryChip = `<span class="ar-primary ${w.tone}">${esc(w.primary.text.toUpperCase())}</span>`;
+      const actionChip  = `<span class="ar-action ${w.tone}">${esc(w.action)}</span>`;
+      return `
+        <button class="ar-row" type="button" data-rep="${esc(w.rep.name)}"
+          aria-label="Coach ${name}: ${esc(w.rationale)}. Suggested: ${esc(w.action)}.">
+          <span class="ar-rep">
+            <span class="ar-name"><b class="${w.tone}">●</b> ${name}</span>
+            <span class="ar-region muted">${region}</span>
+            ${biasChip}
+          </span>
+          <span class="ar-reason">
+            ${primaryChip}
+            <span class="ar-rationale">${esc(w.rationale)}</span>
+          </span>
+          <span class="ar-act-wrap">${actionChip}</span>
+        </button>`;
+    }).join("");
+    if (cap) {
+      cap.innerHTML = `Criteria: <b>attain &lt; 70</b> · activity &lt; 65 · over-commit bias + attain &lt; 90 · top deal missing next step · cold top deal (engagement &lt; 40) · WoW attain ≤ −3pts. <b class="red">RED</b> = 2+ triggers, <b class="amber">AMBER</b> = 1. Click a row to jump to that rep in the leaderboard.`;
+    }
+    bindAtRiskRows();
+  }
+  function bindAtRiskRows() {
+    document.querySelectorAll(".ar-row").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const repName = btn.dataset.rep;
+        if (!repName) return;
+        // Scroll to REP LEADERBOARD and pulse the row.
+        const reps = document.getElementById("reps");
+        if (reps) reps.scrollIntoView({ behavior: "smooth", block: "start" });
+        setTimeout(() => {
+          const tbody = $("reps-tbody");
+          if (!tbody) return;
+          [...tbody.querySelectorAll("tr")].forEach((tr) => {
+            if (tr.textContent.includes(repName)) {
+              tr.classList.add("highlight-pulse");
+              setTimeout(() => tr.classList.remove("highlight-pulse"), 1600);
+            }
+          });
+        }, 250);
+      });
+    });
+  }
+
   /* ---------- SEGMENTS ---------- */
   function renderSegments() {
     const grid = $("seg-grid");
@@ -1547,7 +1697,7 @@
   }
   function runCommand(cmd) {
     if (cmd === "HELP") {
-      flash("CMDS: GO DASH | GO CHG | GO FUNNEL | GO FORECAST | GO DEALS | GO REPS | GO SLIP | GO PIPE | GO COV | GO RISKS | GO AUD | FILTER NA/EMEA/APAC | FCST COMMIT/BEST | MOTION ALL/NEW/EXP | ROTATE");
+      flash("CMDS: GO DASH | GO CHG | GO FUNNEL | GO FORECAST | GO DEALS | GO REPS | GO COACH | GO SLIP | GO PIPE | GO COV | GO RISKS | GO AUD | FILTER NA/EMEA/APAC | FCST COMMIT/BEST | MOTION ALL/NEW/EXP | ROTATE");
       return;
     }
     const goMap = {
@@ -1558,6 +1708,7 @@
       "GO CHG": "changed", "GO CHANGED": "changed",
       "GO PIPE": "pipegen", "GO PIPEGEN": "pipegen",
       "GO COV": "forward-cov", "GO COVERAGE": "forward-cov", "GO FCOV": "forward-cov",
+      "GO RISK": "at-risk-reps", "GO ATRISK": "at-risk-reps", "GO COACH": "at-risk-reps",
       "GO AUD": "audience", "GO AUDIENCE": "audience",
       "GO NOTES": "release"
     };
@@ -1617,6 +1768,7 @@
     bindMyDeals();
     renderMomentumHeatmap();
     renderReps();
+    renderAtRiskReps();
     renderSegments();
     renderRegions();
     renderRisks();

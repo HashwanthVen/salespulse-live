@@ -1048,3 +1048,49 @@ select option { background: var(--bg); color: var(--white); }
   .data-table th:nth-child(8), .data-table td:nth-child(8) { display: none; }
   .fcst-spark { display: none; }
 }
+
+/* AT-RISK REPS coaching list (#21) — derived watchlist. Compact list rows. */
+#at-risk-reps .panel-body { padding-bottom: 8px; }
+.ar-list { display: flex; flex-direction: column; gap: 1px; background: var(--border); border: 1px solid var(--border); margin: 0 14px 6px; }
+.ar-row {
+  display: grid; grid-template-columns: minmax(170px, 220px) 1fr 120px;
+  align-items: center; gap: 12px;
+  padding: 8px 12px; background: var(--bg-1); border: 0; text-align: left;
+  font: inherit; color: inherit; cursor: pointer; width: 100%;
+  font-size: 12px; line-height: 1.3;
+}
+.ar-row:hover  { background: var(--bg-2); }
+.ar-row:focus  { outline: 1px solid var(--green); outline-offset: -1px; }
+.ar-rep        { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; min-width: 0; }
+.ar-rep .ar-name  { font-weight: 700; }
+.ar-rep .ar-name b.red   { color: var(--red); }
+.ar-rep .ar-name b.amber { color: var(--amber); }
+.ar-rep .ar-region { font-size: 10px; letter-spacing: 1px; }
+.ar-reason     { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: baseline; min-width: 0; }
+.ar-rationale  { color: var(--dim); font-family: var(--mono); font-size: 11px; }
+.ar-primary {
+  display: inline-block; padding: 1px 6px; font-family: var(--mono);
+  font-size: 10px; font-weight: 700; letter-spacing: 1px;
+  border: 1px solid currentColor;
+}
+.ar-primary.red   { color: var(--red); }
+.ar-primary.amber { color: var(--amber); }
+.ar-act-wrap   { text-align: right; }
+.ar-action {
+  display: inline-block; padding: 2px 8px; font-family: var(--mono);
+  font-size: 10px; font-weight: 700; letter-spacing: 1px;
+  color: var(--bg-0); background: var(--green);
+}
+.ar-action.red   { background: var(--red);   color: var(--white); }
+.ar-action.amber { background: var(--amber); color: var(--bg-0); }
+.ar-empty { padding: 12px; color: var(--green); font-family: var(--mono); font-size: 12px; }
+.ar-caption { padding: 4px 14px 0; font-size: 11px; color: var(--dim); }
+.ar-caption b { color: var(--white); }
+.ar-caption b.red   { color: var(--red); }
+.ar-caption b.amber { color: var(--amber); }
+
+@media (max-width: 720px) {
+  .ar-row { grid-template-columns: 1fr; gap: 4px; padding: 8px 10px; }
+  .ar-act-wrap { text-align: left; }
+  .ar-rationale { font-size: 10px; }
+}
