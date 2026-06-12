@@ -5,7 +5,9 @@ window.SALESPULSE_DATA = {
     period: "Q2 FY26",
     asOf:   "Jun 12, 2026",
     quotaQ: 60.0,   // $60M quarterly quota
-    quotaY: 230.0
+    quotaY: 230.0,
+    weeksTotal: 13, // weeks in the quarter — used to compute the pace line
+    weekNow:    8   // current week index (matches trend.weeks.length)
   },
 
   /* Top-line KPIs */
@@ -32,12 +34,15 @@ window.SALESPULSE_DATA = {
 
   /* Forecast vs Quota trend (last 8 weeks, weighted commit).
      forecastAccuracy = TTM (trailing twelve months) avg miss vs commit, used
-     to draw the confidence band around the commit series. */
+     to draw the confidence band around the commit series.
+     pace = linear $0 → quotaQ across 13 weeks, sampled at W1..W8 — the
+     "are we ahead or behind pace?" reference line. */
   trend: {
     weeks: ["W1","W2","W3","W4","W5","W6","W7","W8"],
     commit:   [12.4, 18.7, 24.8, 30.2, 36.5, 42.8, 49.6, 55.9],   // running attainment
     bestcase: [14.8, 22.5, 30.1, 37.8, 45.6, 53.2, 61.4, 69.8],
     quota:    [60.0, 60.0, 60.0, 60.0, 60.0, 60.0, 60.0, 60.0],
+    pace:     [4.62, 9.23, 13.85, 18.46, 23.08, 27.69, 32.31, 36.92],
     forecastAccuracy: 0.07
   },
 
@@ -83,15 +88,35 @@ window.SALESPULSE_DATA = {
     { name: "Middle East & Africa", value:  8.2, deals: 14, growth: "+10.8%", status: "Watch" }
   ],
 
-  /* Stalled / at-risk deals */
+  /* Stalled / at-risk deals.
+     Note: the standalone "Q2 deals slipped into Q3" line was removed in v0.5 —
+     the new SLIPPAGE THIS QUARTER panel owns that story end-to-end. */
   risks: [
     { text: "Northwind Industries — pushed close date 2x in last 30 days", severity: "High" },
     { text: "Fabrikam Logistics — no activity in 21 days at Discovery stage", severity: "High" },
     { text: "Wide World Importers — single-threaded (no champion identified)", severity: "Medium" },
     { text: "Litware Inc. — competitor mentioned in last call notes",       severity: "Medium" },
-    { text: "5 Q2 deals slipped into Q3 — concentration risk",              severity: "Medium" },
     { text: "Avg discovery-to-proposal velocity slowing in EMEA",            severity: "Low" }
   ],
+
+  /* Slipped deals — moved from Q2 → later quarter. The single most-watched
+     leading indicator of a forecast miss for CROs on Friday calls.
+     totalAmount/dealCount are the in-period summary; priorQuarterAmount lets
+     us show QoQ delta (this Q is worse than last Q). All accounts/owners/regions
+     reuse existing pools so the panel cross-links cleanly to TOP OPEN DEALS. */
+  slippage: {
+    totalAmount:        7.43,   // $M slipped out of Q2
+    dealCount:          6,
+    priorQuarterAmount: 5.80,   // $M slipped out of Q1 (for QoQ ▲/▼)
+    items: [
+      { account: "Northwind Industries",  owner: "S. Rivera", region: "NA",   segment: "Enterprise",  amount: 2400000, fromClose: "2026-06-15", toClose: "2026-07-22", reason: "Procurement delay" },
+      { account: "Contoso Manufacturing", owner: "L. Patel",  region: "EMEA", segment: "Enterprise",  amount: 1850000, fromClose: "2026-06-28", toClose: "2026-08-12", reason: "Legal/security review" },
+      { account: "Adventure Works",       owner: "S. Rivera", region: "NA",   segment: "Enterprise",  amount: 1100000, fromClose: "2026-06-20", toClose: "2026-07-25", reason: "Budget pushed" },
+      { account: "Wide World Importers",  owner: "L. Patel",  region: "EMEA", segment: "Mid-Market",  amount:  860000, fromClose: "2026-06-28", toClose: "2026-08-22", reason: "Champion left" },
+      { account: "Litware Inc.",          owner: "K. Yamada", region: "APAC", segment: "Enterprise",  amount:  680000, fromClose: "2026-06-22", toClose: "2026-07-20", reason: "Pricing pushback" },
+      { account: "Proseware Systems",     owner: "J. Okafor", region: "NA",   segment: "Mid-Market",  amount:  540000, fromClose: "2026-06-30", toClose: "2026-08-30", reason: "Procurement delay" }
+    ]
+  },
 
   /* AI insights — 3 rotating sets */
   insights: [

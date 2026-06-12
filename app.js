@@ -97,10 +97,24 @@
     const acc = D.trend.forecastAccuracy || 0;
     const commitVals = D.trend.commit;
     const showBand = series === "commit" && acc > 0;
+
+    // Pace line: linear $0 → quotaQ across meta.weeksTotal weeks, sampled
+    // at the same week indices the chart shows. Prefer the precomputed
+    // trend.pace array for transparency; fall back to a live compute if
+    // weeksTotal exists. Either way, this is the "where commit should be
+    // today to stay on a flat linear pace to quota" reference.
+    const weeksTotal = (D.meta && D.meta.weeksTotal) || values.length;
+    const quotaQ     = (D.meta && D.meta.quotaQ)     || quota[quota.length - 1];
+    let pace = D.trend.pace;
+    if (!Array.isArray(pace) || pace.length !== values.length) {
+      pace = values.map((_, i) => +(quotaQ * ((i + 1) / weeksTotal)).toFixed(2));
+    }
+
     const all = values.concat(quota);
     if (showBand) {
       for (const v of commitVals) all.push(v * (1 + acc));
     }
+    for (const v of pace) all.push(v);
     const max = Math.max(...all);
     const min = 0;
     const range = Math.max(max - min, 1);
@@ -126,9 +140,10 @@
       bandSvg = `<path class="chart-band" d="${upper}${lower} Z"/>`;
     }
 
-    const linePath = values.map((v, i) => `${i === 0 ? "M" : "L"}${toX(i).toFixed(1)},${toY(v).toFixed(1)}`).join(" ");
-    const areaPath = linePath + ` L${toX(values.length-1).toFixed(1)},${PADT+innerH} L${toX(0).toFixed(1)},${PADT+innerH} Z`;
+    const linePath  = values.map((v, i) => `${i === 0 ? "M" : "L"}${toX(i).toFixed(1)},${toY(v).toFixed(1)}`).join(" ");
+    const areaPath  = linePath + ` L${toX(values.length-1).toFixed(1)},${PADT+innerH} L${toX(0).toFixed(1)},${PADT+innerH} Z`;
     const quotaPath = quota.map((v, i) => `${i === 0 ? "M" : "L"}${toX(i).toFixed(1)},${toY(v).toFixed(1)}`).join(" ");
+    const pacePath  = pace.map((v, i)  => `${i === 0 ? "M" : "L"}${toX(i).toFixed(1)},${toY(v).toFixed(1)}`).join(" ");
 
     const dots = values.map((v, i) => `<circle class="chart-dot" cx="${toX(i).toFixed(1)}" cy="${toY(v).toFixed(1)}" r="3"/>`).join("");
 
@@ -137,27 +152,39 @@
       <g class="chart-axis">${xLabels}</g>
       ${bandSvg}
       <path class="chart-area" d="${areaPath}"/>
+      <path class="chart-pace" d="${pacePath}"/>
       <path class="chart-line" d="${linePath}"/>
       <path class="chart-quota" d="${quotaPath}"/>
       <g>${dots}</g>
     `;
 
-    const last = values[values.length - 1];
-    const target = quota[quota.length - 1];
-    const gap = (last - target).toFixed(1);
-    const gapCls = gap >= 0 ? "green" : "red";
+    const last       = values[values.length - 1];
+    const target     = quota[quota.length - 1];
+    const gap        = (last - target).toFixed(1);
+    const gapCls     = gap >= 0 ? "green" : "red";
+    const weekNow    = (D.meta && D.meta.weekNow) || values.length;
+    const paceNow    = pace[pace.length - 1];
+    const paceDiff   = +(last - paceNow).toFixed(1);
+    const paceCls    = paceDiff >= 0 ? "green" : "red";
+    const paceArrow  = paceDiff >= 0 ? "▲" : "▼";
+    const paceLabel  = paceDiff >= 0 ? "AHEAD" : "BEHIND";
+    const paceAmt    = "$" + Math.abs(paceDiff).toFixed(1) + "M";
+
     if (stat) {
       stat.innerHTML = `
         <div><span>SERIES</span><b>${series === "commit" ? "COMMIT" : "BEST CASE"}</b></div>
         <div><span>CURRENT</span><b>$${last.toFixed(1)}M</b></div>
         <div><span>QUOTA</span><b>$${target.toFixed(1)}M</b></div>
         <div><span>GAP</span><b class="${gapCls}">${gap >= 0 ? "+" : ""}$${gap}M</b></div>
+        <div><span>PACE W${weekNow}</span><b>$${paceNow.toFixed(1)}M</b></div>
+        <div><span>vs PACE</span><b class="${paceCls}">${paceArrow} ${paceAmt} ${paceLabel}</b></div>
       `;
     }
     if (cap) {
+      const pacePart = `Pace line: linear $0 → quota across ${weeksTotal} weeks. Above pace = ahead of plan.`;
       cap.textContent = showBand
-        ? `Confidence band: ±${(acc * 100).toFixed(0)}% based on TTM forecast accuracy`
-        : "";
+        ? `Confidence band: ±${(acc * 100).toFixed(0)}% based on TTM forecast accuracy · ${pacePart}`
+        : pacePart;
     }
   }
   function bindToggle() {
@@ -202,7 +229,7 @@
       const probCls = d.prob >= 70 ? "green" : d.prob >= 40 ? "amber" : "red";
       const fcst = (d.forecast || "upside").toLowerCase();
       return `
-        <tr>
+        <tr data-account="${esc(d.account)}">
           <td><b class="green">${esc(d.account)}</b></td>
           <td>${esc(d.stage)}</td>
           <td class="num">$${formatK(d.amount)}</td>
@@ -266,6 +293,122 @@
       });
     }
     updateMyDealsBtn();
+  }
+
+  /* ---------- SLIPPAGE THIS QUARTER ---------- */
+  // Computes the panel from D.slippage: header stat (deal count, $$ out,
+  // QoQ delta), the per-deal table with severity-tinted amounts, and a
+  // concentration footer (top owner / region / reason — all derived from
+  // the data, not hardcoded). Clicking a row jumps to that account in the
+  // TOP OPEN DEALS table and pulses the row briefly. If the deal is hidden
+  // by the current filters, filters are cleared so the row can be located.
+  function renderSlippage() {
+    const s = D.slippage;
+    if (!s || !Array.isArray(s.items)) return;
+    const head = $("slip-stat");
+    const body = $("slip-tbody");
+    const foot = $("slip-foot");
+    if (!head && !body && !foot) return;
+
+    const qoq = s.priorQuarterAmount > 0
+      ? ((s.totalAmount - s.priorQuarterAmount) / s.priorQuarterAmount) * 100
+      : 0;
+    const qoqUp  = qoq >= 0;
+    const qoqCls = qoqUp ? "red" : "green"; // more slippage = bad (red), less = good
+    if (head) {
+      head.innerHTML = `
+        <span><span class="muted">SLIPPED</span> <b class="red">${s.dealCount}</b> deals</span>
+        <span class="sep">·</span>
+        <span><b class="red">$${s.totalAmount.toFixed(2)}M</b> out of ${esc(D.meta && D.meta.period || "this Q")}</span>
+        <span class="sep">·</span>
+        <span class="${qoqCls}">${qoqUp ? "▲" : "▼"} ${Math.abs(qoq).toFixed(0)}%</span>
+        <span class="muted"> vs prior Q ($${s.priorQuarterAmount.toFixed(2)}M)</span>`;
+    }
+
+    if (body) {
+      body.innerHTML = s.items.slice().sort((a, b) => b.amount - a.amount).map((it) => {
+        const amtCls = it.amount >= 1_000_000 ? "red" : it.amount >= 500_000 ? "amber" : "";
+        return `
+          <tr data-slip-account="${esc(it.account)}" tabindex="0" role="button"
+              title="Jump to ${esc(it.account)} in TOP OPEN DEALS">
+            <td><b class="green">${esc(it.account)}</b></td>
+            <td>${esc(it.owner)}</td>
+            <td>${esc(it.region)}</td>
+            <td class="num ${amtCls}">$${formatK(it.amount)}</td>
+            <td><span class="muted">${esc(it.fromClose)}</span> → <b>${esc(it.toClose)}</b></td>
+            <td>${esc(it.reason)}</td>
+          </tr>`;
+      }).join("");
+
+      const handler = (e) => {
+        const tr = e.target.closest("tr[data-slip-account]");
+        if (!tr) return;
+        if (e.type === "keydown" && e.key !== "Enter" && e.key !== " ") return;
+        e.preventDefault();
+        highlightDealRow(tr.dataset.slipAccount);
+      };
+      body.addEventListener("click", handler);
+      body.addEventListener("keydown", handler);
+    }
+
+    if (foot) {
+      const byOwner  = bucketSum(s.items, "owner",  "amount");
+      const byRegion = bucketSum(s.items, "region", "amount");
+      const byReason = bucketCount(s.items, "reason");
+      const topOwner  = topOf(byOwner);
+      const topRegion = topOf(byRegion);
+      const topReason = topOf(byReason);
+      foot.innerHTML = `
+        <span><span class="muted">TOP OWNER</span> <b>${esc(topOwner.key)}</b> ($${(topOwner.val/1e6).toFixed(2)}M)</span>
+        <span class="sep">·</span>
+        <span><span class="muted">TOP REGION</span> <b>${esc(topRegion.key)}</b> ($${(topRegion.val/1e6).toFixed(2)}M)</span>
+        <span class="sep">·</span>
+        <span><span class="muted">TOP REASON</span> <b>${esc(topReason.key)}</b> (${topReason.val})</span>`;
+    }
+  }
+  function bucketSum(items, key, sumKey) {
+    const out = {};
+    for (const it of items) out[it[key]] = (out[it[key]] || 0) + it[sumKey];
+    return out;
+  }
+  function bucketCount(items, key) {
+    const out = {};
+    for (const it of items) out[it[key]] = (out[it[key]] || 0) + 1;
+    return out;
+  }
+  function topOf(map) {
+    let bestK = "—", bestV = -Infinity;
+    for (const k in map) { if (map[k] > bestV) { bestV = map[k]; bestK = k; } }
+    return { key: bestK, val: bestV === -Infinity ? 0 : bestV };
+  }
+
+  /* Jump-to-deal + 1.5s green pulse highlight. Called by SLIPPAGE row clicks. */
+  function highlightDealRow(account) {
+    const tbody = $("deals-tbody");
+    if (!tbody) return;
+    const find = () => {
+      for (const tr of tbody.querySelectorAll("tr[data-account]")) {
+        if (tr.dataset.account === account) return tr;
+      }
+      return null;
+    };
+    let row = find();
+    if (!row) {
+      // Deal is hidden by current filters — clear them and re-render so we can find it.
+      const search = $("deal-search");   if (search) search.value = "";
+      const region = $("deal-region");   if (region) region.value = "all";
+      const fcst   = $("deal-forecast"); if (fcst)   fcst.value   = "all";
+      if (myDealsActive) { myDealsActive = false; updateMyDealsBtn(); }
+      applyDealFilters();
+      row = find();
+    }
+    if (!row) { flash(`Could not locate ${account} in TOP OPEN DEALS`, "err"); return; }
+    row.scrollIntoView({ behavior: "smooth", block: "center" });
+    row.classList.remove("highlight-pulse");
+    // Force reflow so re-adding the class restarts the animation.
+    void row.offsetWidth;
+    row.classList.add("highlight-pulse");
+    setTimeout(() => row.classList.remove("highlight-pulse"), 1600);
   }
 
   /* ---------- REPS ---------- */
@@ -422,14 +565,15 @@
   }
   function runCommand(cmd) {
     if (cmd === "HELP") {
-      flash("CMDS: GO DASH | GO FUNNEL | GO FORECAST | GO DEALS | GO REPS | GO RISKS | GO AUD | FILTER NA/EMEA/APAC | FCST COMMIT/BEST | ROTATE");
+      flash("CMDS: GO DASH | GO FUNNEL | GO FORECAST | GO DEALS | GO REPS | GO SLIP | GO RISKS | GO AUD | FILTER NA/EMEA/APAC | FCST COMMIT/BEST | ROTATE");
       return;
     }
     const goMap = {
       "GO DASH": "dashboard", "GO KPIS": "dashboard", "GO FUNNEL": "funnel",
       "GO FORECAST": "forecast", "GO FCST": "forecast", "GO DEALS": "deals",
       "GO REPS": "reps", "GO SEG": "segments", "GO SEGMENTS": "segments",
-      "GO RISKS": "risks", "GO AUD": "audience", "GO AUDIENCE": "audience",
+      "GO RISKS": "risks", "GO SLIP": "slippage", "GO SLIPPAGE": "slippage",
+      "GO AUD": "audience", "GO AUDIENCE": "audience",
       "GO NOTES": "release"
     };
     if (goMap[cmd]) { const el = document.getElementById(goMap[cmd]); if (el) el.scrollIntoView({ behavior: "smooth", block: "start" }); return; }
@@ -486,6 +630,7 @@
     renderSegments();
     renderRegions();
     renderRisks();
+    renderSlippage();
     renderInsight();
     bindRegen();
     bindCommand();

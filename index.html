@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>SALESPULSE LIVE · TERMINAL</title>
   <meta name="description" content="SalesPulse Live — Bloomberg-style sales pipeline command center for VPs of Sales, RevOps, and AEs. Synthetic data only." />
-  <link rel="stylesheet" href="styles.css?v=0.3.0" />
+  <link rel="stylesheet" href="styles.css?v=0.5.0" />
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to main content</a>
@@ -35,7 +35,8 @@
     <a class="fkey" href="#reps"><span class="k">F6</span> REPS</a>
     <a class="fkey" href="#segments"><span class="k">F7</span> SEG</a>
     <a class="fkey" href="#risks"><span class="k">F8</span> RISK</a>
-    <a class="fkey" href="#audience"><span class="k">F9</span> AUD</a>
+    <a class="fkey" href="#slippage"><span class="k">F9</span> SLIP</a>
+    <a class="fkey" href="#audience"><span class="k">F10</span> AUD</a>
     <a class="fkey primary" href="requests.html"><span class="k">+</span> FEEDBACK</a>
   </nav>
 
@@ -103,6 +104,7 @@
           <div class="chart-legend">
             <span><span class="swatch" style="background:var(--green)"></span>Selected series</span>
             <span><span class="swatch" style="background:var(--amber);height:2px;margin-bottom:3px;"></span>Quota line</span>
+            <span><span class="swatch swatch-pace"></span>Pace line</span>
             <span><span class="swatch swatch-band"></span>Confidence band</span>
           </div>
           <div class="chart-caption" id="chart-caption"></div>
@@ -148,6 +150,36 @@
           </thead>
           <tbody id="deals-tbody"></tbody>
         </table>
+      </div>
+    </section>
+
+    <!-- SLIPPAGE THIS QUARTER -->
+    <section id="slippage" class="panel" aria-labelledby="slip-title">
+      <div class="panel-head">
+        <span class="title" id="slip-title">SLIPPAGE THIS QUARTER</span>
+        <span class="sub">DEALS PUSHED OUT OF PERIOD</span>
+        <div class="right">
+          <span class="muted" style="font-size:10px;">Click a row to jump to that account in TOP OPEN DEALS</span>
+        </div>
+      </div>
+      <div class="panel-body tight">
+        <div class="slip-stat" id="slip-stat" aria-live="polite"></div>
+        <div class="slip-table-wrap" style="overflow-x:auto;">
+          <table class="data-table slip-table">
+            <thead>
+              <tr>
+                <th>ACCOUNT</th>
+                <th>OWNER</th>
+                <th>RGN</th>
+                <th class="num">AMOUNT</th>
+                <th>FROM → TO</th>
+                <th>REASON</th>
+              </tr>
+            </thead>
+            <tbody id="slip-tbody"></tbody>
+          </table>
+        </div>
+        <div class="slip-foot" id="slip-foot"></div>
       </div>
     </section>
 
@@ -265,6 +297,8 @@
       </div>
       <div class="panel-body">
         <ul class="rel-list">
+          <li><span class="ver">v0.5</span> <b>SLIPPAGE THIS QUARTER</b> panel — slipped deals, $$ out of period, FROM → TO dates, reasons, with concentration footer (top owner / region / reason). Click any row to jump to that account in TOP OPEN DEALS with a brief highlight. Removed the redundant single-line slippage entry from DEAL RISK & ANOMALY (the new panel owns the story) · closes #8</li>
+          <li><span class="ver">v0.4</span> FORECAST vs QUOTA: dashed <b>pace line</b> (linear $0 → quota across 13 weeks) + <b>PACE W8</b> / <b>vs PACE</b> stats so CROs can answer "are we ahead or behind pace?" in one glance — recomputes on COMMIT/BEST CASE toggle · closes #7</li>
           <li><span class="ver">v0.3</span> FORECAST vs QUOTA: confidence band around the COMMIT series (±7% TTM forecast accuracy) so CROs can defend the commit number on Friday calls · Mobile (≤720px): funnel conversion label now wraps under the bar so every stage — including Closed Won's "— win —" — renders consistently at 360px · closes #1 and #5</li>
           <li><span class="ver">v0.2</span> Pipeline Funnel: deal aging buckets per stage (0-14d / 15-30d / <span class="red">30d+</span>) — stalled deals now visible at a glance · Top Open Deals: one-click <b>MY DEALS</b> toggle (filters to the rep selected in the new ACTING AS picker, persisted across visits) · closes #2 and #4</li>
           <li><span class="ver">v0.1</span> Baseline SalesPulse Live dashboard · 6 KPIs · funnel · forecast vs quota · top deals · rep leaderboard · segments + regions · risks · live audience feedback</li>
@@ -283,7 +317,7 @@
     <span class="seg right"><span class="l">SYS</span> <span id="clock2">--:--:--</span></span>
   </div>
 
-  <script src="data.js?v=0.3.0"></script>
-  <script src="app.js?v=0.3.0"></script>
+  <script src="data.js?v=0.5.0"></script>
+  <script src="app.js?v=0.5.0"></script>
 </body>
 </html>
