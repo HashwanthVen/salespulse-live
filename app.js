@@ -519,6 +519,7 @@
     catch (e) { return false; }
   })();
   let sortByNextStep = false;
+  let sortByMomentum = false;
   function dealHealth(d) {
     if (!d.nextStep) return "missing";
     const n = d.nextStep.daysFromNow;
@@ -527,6 +528,23 @@
     return "soon";
   }
   const HEALTH_RANK = { missing: 0, overdue: 1, soon: 2, on: 3 };
+  /* ---------- MOMENTUM (#14) — per-deal engagement signal ----------
+     Tone bands: hot ≥ 70, warm 40-69, cold < 40. Trend is vs prior week. */
+  function momentumTone(score) {
+    if (score == null) return "cold";
+    if (score >= 70) return "hot";
+    if (score >= 40) return "warm";
+    return "cold";
+  }
+  function momentumCell(d) {
+    const e = d.engagement;
+    if (!e) return `<td class="num momentum"><span class="muted">—</span></td>`;
+    const tone = momentumTone(e.score);
+    const trendArr = e.trend === "up" ? "▲" : e.trend === "down" ? "▼" : "─";
+    const trendCls = e.trend === "up" ? "up" : e.trend === "down" ? "down" : "flat";
+    const tip = `${e.touchpoints14d} touchpoints / ${e.lastTouchDays}d since last touch / ${e.multiThreaded ? "multi-threaded" : "single-threaded"}`;
+    return `<td class="num momentum" title="${esc(tip)}"><span class="mo-dot mo-${tone}">●</span> <span class="mo-score">${e.score}</span> <span class="mo-trend mo-${trendCls}">${trendArr}</span></td>`;
+  }
   function nextStepCell(d) {
     if (!d.nextStep) {
       return `<td class="next-step"><span class="ns-missing" title="No next step logged — un-defensible in pipe review">MISSING</span></td>`;
@@ -545,7 +563,7 @@
     const tbody = $("deals-tbody");
     if (!tbody) return;
     if (rows.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="11" style="text-align:center;color:var(--dim);padding:18px;">NO MATCHING DEALS</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="12" style="text-align:center;color:var(--dim);padding:18px;">NO MATCHING DEALS</td></tr>`;
       setText("deals-count", "0 OPEN · $0.0M");
       renderDealsHealth([]);
       return;
@@ -555,7 +573,10 @@
     // Pre-compute the top-3 set so each row knows whether to render the
     // TOP-3 CONCENTRATION (#11) star badge in the ACCOUNT column.
     const top3 = topAccountSet();
-    if (sortByNextStep) {
+    if (sortByMomentum) {
+      // Highest momentum first (descending). Stable secondary sort by amount.
+      rows = rows.slice().sort((a, b) => ((b.engagement && b.engagement.score) || 0) - ((a.engagement && a.engagement.score) || 0) || b.amount - a.amount);
+    } else if (sortByNextStep) {
       rows = rows.slice().sort((a, b) => HEALTH_RANK[dealHealth(a)] - HEALTH_RANK[dealHealth(b)] || b.amount - a.amount);
     }
     tbody.innerHTML = rows.map((d) => {
@@ -573,6 +594,7 @@
           <td>${esc(d.stage)}</td>
           <td class="num">$${formatK(d.amount)}</td>
           <td class="num ${probCls}">${d.prob}%</td>
+          ${momentumCell(d)}
           <td>${esc(d.close)}</td>
           ${nextStepCell(d)}
           <td>${esc(d.owner)}</td>
@@ -639,10 +661,45 @@
     if (thNs) {
       thNs.addEventListener("click", () => {
         sortByNextStep = !sortByNextStep;
+        if (sortByNextStep) sortByMomentum = false;
         thNs.classList.toggle("sorted", sortByNextStep);
+        const thMo = $("th-momentum"); if (thMo) thMo.classList.remove("sorted");
         applyDealFilters();
       });
     }
+    const thMo = $("th-momentum");
+    if (thMo) {
+      thMo.addEventListener("click", () => {
+        sortByMomentum = !sortByMomentum;
+        if (sortByMomentum) sortByNextStep = false;
+        thMo.classList.toggle("sorted", sortByMomentum);
+        const thNs2 = $("th-nextstep"); if (thNs2) thNs2.classList.remove("sorted");
+        applyDealFilters();
+      });
+    }
+  }
+
+  /* ---------- MOMENTUM HEATMAP RIBBON (#14) ----------
+     12 small cells above the table, sorted by deal $$ desc, colored by score.
+     Click a cell → reuses highlightDealRow() so the row scrolls + pulses. */
+  function renderMomentumHeatmap() {
+    const host = $("mo-heat");
+    if (!host) return;
+    const rows = D.topDeals.slice().sort((a, b) => b.amount - a.amount);
+    host.innerHTML = rows.map((d) => {
+      const e = d.engagement || { score: null };
+      const tone = momentumTone(e.score);
+      const trend = e.trend === "up" ? "▲" : e.trend === "down" ? "▼" : "─";
+      const lbl = (d.account || "").replace(/[^A-Za-z0-9]/g, "").slice(0, 4).toUpperCase();
+      const tip = `${d.account} · $${(d.amount/1e6).toFixed(2)}M · ${e.score == null ? "—" : "MOMENTUM " + e.score} ${trend}`;
+      return `<button type="button" class="mo-cell mo-${tone}" data-account="${esc(d.account)}" title="${esc(tip)}" aria-label="${esc(tip)}"><span class="mo-cell-lbl">${esc(lbl)}</span><span class="mo-cell-trend">${trend}</span></button>`;
+    }).join("");
+    host.querySelectorAll(".mo-cell").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const acct = btn.dataset.account;
+        if (acct) highlightDealRow(acct);
+      });
+    });
   }
   function updateMyDealsBtn() {
     const btn = $("deal-mine");
@@ -1225,6 +1282,7 @@
     renderDeals(D.topDeals.slice().sort((a,b) => b.amount - a.amount));
     bindDealFilters();
     bindMyDeals();
+    renderMomentumHeatmap();
     renderReps();
     renderSegments();
     renderRegions();

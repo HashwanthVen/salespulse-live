@@ -389,6 +389,43 @@ main { padding: 10px 12px 50px; max-width: 1600px; margin: 0 auto; }
   .ns-text { display: none; }
 }
 
+/* MOMENTUM column + 12-cell heatmap ribbon (#14). Reuses green/amber/red
+   palette so no new colors. Heatmap cells are flat buttons (no shadows). */
+.momentum { white-space: nowrap; min-width: 90px; }
+.mo-dot { font-size: 13px; vertical-align: -1px; }
+.mo-dot.mo-hot  { color: var(--green); }
+.mo-dot.mo-warm { color: var(--amber); }
+.mo-dot.mo-cold { color: var(--red); }
+.mo-score { font-weight: 700; font-family: var(--mono); padding-left: 2px; }
+.mo-trend { font-size: 11px; padding-left: 4px; font-weight: 700; }
+.mo-trend.mo-up   { color: var(--green); }
+.mo-trend.mo-down { color: var(--red); }
+.mo-trend.mo-flat { color: var(--dim); }
+
+.mo-heat {
+  display: grid; grid-template-columns: repeat(12, 1fr);
+  gap: 2px; margin: 0 0 8px 0;
+}
+.mo-cell {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  background: var(--bg-1); border: 1px solid var(--border); padding: 4px 2px;
+  font-family: var(--mono); font-size: 9px; letter-spacing: 0.5px;
+  color: var(--white); cursor: pointer; min-height: 30px;
+}
+.mo-cell:hover  { border-color: var(--green); }
+.mo-cell:focus  { outline: 1px solid var(--green); outline-offset: 1px; }
+.mo-cell.mo-hot  { border-left: 3px solid var(--green); color: var(--green); }
+.mo-cell.mo-warm { border-left: 3px solid var(--amber); color: var(--amber); }
+.mo-cell.mo-cold { border-left: 3px solid var(--red);   color: var(--red); }
+.mo-cell-lbl   { font-weight: 700; font-size: 10px; }
+.mo-cell-trend { font-size: 10px; color: inherit; opacity: 0.85; line-height: 1; margin-top: 1px; }
+
+@media (max-width: 720px) {
+  .mo-heat { grid-template-columns: repeat(6, 1fr); }
+  .mo-score { display: none; }
+  .momentum { min-width: 56px; }
+}
+
 /* WHAT CHANGED SINCE LAST FORECAST — 4-card grid (stacks ≤720px).
    Card style is minimal (no rounded corners / shadows) to fit the
    terminal aesthetic. Lists inside cards are dense, tabular. */

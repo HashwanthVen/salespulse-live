@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>SALESPULSE LIVE · TERMINAL</title>
   <meta name="description" content="SalesPulse Live — Bloomberg-style sales pipeline command center for VPs of Sales, RevOps, and AEs. Synthetic data only." />
-  <link rel="stylesheet" href="styles.css?v=0.10.0" />
+  <link rel="stylesheet" href="styles.css?v=0.11.0" />
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to main content</a>
@@ -159,6 +159,7 @@
         </div>
       </div>
       <div class="panel-body tight" style="overflow-x:auto;">
+        <div id="mo-heat" class="mo-heat" aria-label="Top deals momentum heatmap — sorted by amount"></div>
         <table class="data-table">
           <thead>
             <tr>
@@ -166,6 +167,7 @@
               <th>STAGE</th>
               <th class="num">AMOUNT</th>
               <th class="num">PROB</th>
+              <th class="num sortable" id="th-momentum" title="Sort by momentum score">MOMENTUM</th>
               <th>CLOSE</th>
               <th class="sortable" id="th-nextstep" title="Sort by next-step health: missing → overdue → on-track">NEXT STEP</th>
               <th>OWNER</th>
@@ -351,6 +353,7 @@
       </div>
       <div class="panel-body">
         <ul class="rel-list">
+          <li><span class="ver">v0.11</span> <b>TOP OPEN DEALS: per-deal MOMENTUM column + heatmap ribbon</b> — surfaces ghosting deals before they slip. New MOMENTUM column between PROB and CLOSE shows a dot (green / amber / red by score), a 0–100 score, and a ▲/─/▼ trend arrow vs prior week. Hover any cell for the underlying touchpoints, last-touch days, and single/multi-thread tooltip (§9.7 trust). Sortable column. A 12-cell heatmap ribbon above the table is sorted by amount: scan momentum vs deal-size at a glance, click any cell to scroll + pulse that row in the table (§9.5 action). Story this quarter: 4 of the top-12 are trending DOWN (Northwind / Fabrikam / Lucerne / Litware — combined $3.1M weighted) and the new AI insight bullet ties the count to the recommended manager-led pipe review · closes #14</li>
           <li><span class="ver">v0.10</span> <b>TOP OPEN DEALS: NEXT STEP column + health rollup</b> — the #1 Monday pipe-review question ("which deals don't have a defined next step?") answered inline. New column between CLOSE and OWNER renders the next step action + a chip for due-in-N-days (green ✓), N-days OVERDUE (red ◀), or bold <b>MISSING</b> for deals with no logged next step. Panel-head <b>NEXT-STEP HEALTH</b> stat shows ✓ on track · ● due soon · ✗ overdue/missing — click the ✗ count to filter the table down to just the un-defensible commit deals in one click (persisted via localStorage). Sortable column header (missing → overdue → due-soon → on-track). TOP-3 CONCENTRATION tile tooltip now also flags top-3 deals missing a next step. New AI insight bullet ties the count + $$ to a recommended action · closes #15</li>
           <li><span class="ver">v0.9</span> <b>PIPELINE CREATED panel</b> — the missing leading indicator for the marketing↔sales handoff. Weekly NEW IN (green) vs OUT / closed / DQ'd (amber) bar pairs over the trailing 8 weeks, with a dashed target line ($13.5M/wk derived from quota × 3x coverage ÷ 13 weeks) and a red flag tick on any week below target (W1, W3, W7 in the current data). Header stat row shows THIS WK NET · TTW AVG NET · TARGET. Compact source-mix stacked bar below (outbound / inbound / partner / expansion). Pipegen ticker symbol and AI insight bullet added. `GO PIPE` / `GO PIPEGEN` commands · closes #12</li>
           <li><span class="ver">v0.8</span> <b>TOP-3 CONCENTRATION tile</b> appended to the KPI desk — "if top 3 deals slip, do we still hit number?" answered in one glance. Headline % of weighted pipe, $$ in 3 accounts, and a footer micro-stat showing whether commit still covers quota or by how much it would miss. Tone shifts at 25% (warn) and 40% (bad). Click the tile to scroll to TOP OPEN DEALS and pulse the 3 starred rows; same accounts also get a <i>★</i> badge in the table for instant visual link. AI insights bullet added. The tile honors the NEW vs EXPANSION lens so the top-3 always matches the currently visible deal slice · closes #11</li>
@@ -376,7 +379,7 @@
     <span class="seg right"><span class="l">SYS</span> <span id="clock2">--:--:--</span></span>
   </div>
 
-  <script src="data.js?v=0.10.0"></script>
-  <script src="app.js?v=0.10.0"></script>
+  <script src="data.js?v=0.11.0"></script>
+  <script src="app.js?v=0.11.0"></script>
 </body>
 </html>
