@@ -2191,3 +2191,114 @@ main.lens-board tr.expander-row { display: none; }
   .cs-bench { margin-left: 0; }
   .cs-seg-lbl { font-size: 9.5px; }
 }
+
+
+/* ==========================================================================
+   #33 DEAL HEALTH SCORE (v0.27) — composite per-deal health + portfolio tile
+   ========================================================================== */
+
+/* HEALTH cell in TOP OPEN DEALS row */
+.health-cell {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11.5px;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+}
+.health-cell .h-glyph { margin-right: 2px; }
+.health-cell.h-strong   { color: var(--green); }
+.health-cell.h-ok       { color: var(--green); opacity: 0.85; }
+.health-cell.h-atrisk   { color: var(--amber); }
+.health-cell.h-critical { color: var(--red); }
+th#th-health { cursor: pointer; }
+th#th-health.sorted { color: var(--green); }
+
+/* PORTFOLIO HEALTH tile inside DEAL RISK panel */
+.portfolio-health {
+  border: 1px solid var(--border);
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  background: rgba(255,255,255,0.015);
+}
+.portfolio-health .ph-head {
+  display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+.portfolio-health .ph-title {
+  font-size: 10.5px; letter-spacing: 0.8px; color: var(--dim);
+  text-transform: uppercase;
+}
+.portfolio-health .ph-big {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 20px; font-weight: 600; color: var(--text);
+}
+.portfolio-health .ph-of { font-size: 11px; color: var(--dim); }
+.portfolio-health .ph-band-chip {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10.5px; padding: 1px 6px; border: 1px solid var(--border);
+  letter-spacing: 0.4px;
+}
+.portfolio-health .ph-band-chip.h-strong   { color: var(--green); border-color: var(--green); }
+.portfolio-health .ph-band-chip.h-ok       { color: var(--green); opacity: 0.85; }
+.portfolio-health .ph-band-chip.h-atrisk   { color: var(--amber); border-color: var(--amber); }
+.portfolio-health .ph-band-chip.h-critical { color: var(--red); border-color: var(--red); }
+.portfolio-health .ph-wow {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10.5px; color: var(--dim); margin-left: auto;
+}
+.portfolio-health .ph-wow.up   { color: var(--green); }
+.portfolio-health .ph-wow.down { color: var(--red); }
+.portfolio-health .ph-bar {
+  position: relative; height: 6px; background: rgba(255,255,255,0.04);
+  border: 1px solid var(--border); margin: 6px 0;
+}
+.portfolio-health .ph-bar-fill { height: 100%; background: var(--green); transition: width 0.3s ease; }
+.portfolio-health .ph-bar-fill.h-strong   { background: var(--green); }
+.portfolio-health .ph-bar-fill.h-ok       { background: var(--green); opacity: 0.7; }
+.portfolio-health .ph-bar-fill.h-atrisk   { background: var(--amber); }
+.portfolio-health .ph-bar-fill.h-critical { background: var(--red); }
+.portfolio-health .ph-buckets {
+  display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px;
+}
+.portfolio-health .ph-bucket {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10.5px; padding: 2px 7px; border: 1px solid var(--border);
+  background: transparent; color: var(--dim); cursor: pointer;
+  letter-spacing: 0.3px;
+}
+.portfolio-health .ph-bucket:hover { color: var(--text); border-color: var(--green); }
+.portfolio-health .ph-bucket.active { color: var(--text); background: rgba(255,255,255,0.04); }
+.portfolio-health .ph-bucket.h-strong.active   { border-color: var(--green); color: var(--green); }
+.portfolio-health .ph-bucket.h-atrisk.active   { border-color: var(--amber); color: var(--amber); }
+.portfolio-health .ph-bucket.h-critical.active { border-color: var(--red); color: var(--red); }
+.portfolio-health .ph-critical-amt {
+  margin-top: 6px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px; color: var(--red);
+}
+.portfolio-health .ph-mismatch {
+  display: inline-block; margin-left: 6px; padding: 0 4px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px; color: var(--amber); border: 1px solid var(--amber);
+}
+
+/* HEALTH filter chip above TOP OPEN DEALS */
+.health-filter-chip {
+  display: flex; gap: 6px; align-items: center; flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+.health-filter-chip:empty { display: none; }
+.health-filter-chip .hf-chip {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10.5px; padding: 2px 7px; border: 1px solid var(--red);
+  color: var(--red); background: rgba(208,77,77,0.06);
+  letter-spacing: 0.3px; cursor: pointer;
+}
+.health-filter-chip .hf-chip:hover { background: rgba(208,77,77,0.12); }
+.health-filter-chip .hf-x { opacity: 0.7; margin-left: 4px; }
+
+/* Mobile — collapse HEALTH cell to glyph only */
+@media (max-width: 480px) {
+  .health-cell b { display: none; }
+  .portfolio-health .ph-big { font-size: 16px; }
+  .portfolio-health .ph-buckets { gap: 4px; }
+  .portfolio-health .ph-bucket { font-size: 10px; padding: 2px 5px; }
+}

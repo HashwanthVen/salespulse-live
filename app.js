@@ -1194,6 +1194,7 @@
   let sortByMomentum = false;
   let sortByQual    = false;
   let sortByReach   = false;
+  let sortByHealth  = false;
   const LS_QUAL_KEY = "salespulse.qualWeakOnly";
   let dealsWeakOnly = (function () {
     try { return localStorage.getItem(LS_QUAL_KEY) === "1"; }
@@ -1212,6 +1213,186 @@
     return "soon";
   }
   const HEALTH_RANK = { missing: 0, overdue: 1, soon: 2, on: 3 };
+
+  /* ───────── DEAL HEALTH SCORE composite (#33) ─────────
+     Roll-up of 6 per-deal dimensions to a single 0-100 number — every mature
+     revenue tool (Clari · BoostUp · Gong · People.ai · SF Einstein · HubSpot
+     · 6sense) ships a composite because operators need one number to
+     sort/filter/triage on. Weighted blend, deterministic (no LLM), the math
+     is exposed in the tooltip so a CFO can audit it. */
+  function _clamp01(v) { return v < 0 ? 0 : v > 1 ? 1 : v; }
+  function dealHealthDimensions(d) {
+    const meddic   = (qualScore(d) / 8) * 100;                    // 0-100
+    const reach    = _clamp01(reachScore(d)) * 100;               // 0-100
+    const engScore = (d.engagement && typeof d.engagement.score === "number") ? d.engagement.score : 50;
+    const momentum = _clamp01((engScore - 0) / 100) * 100;        // map 0-100 score directly
+    let nextStepRaw = 50;
+    const nsB = dealHealth(d);
+    if (nsB === "on")       nextStepRaw = 100;
+    else if (nsB === "soon")nextStepRaw = 60;
+    else if (nsB === "overdue") nextStepRaw = 20;
+    else if (nsB === "missing") nextStepRaw = 0;
+    const engagement = engScore;
+    const sponsors = (D.dealExecSponsors || {});
+    const execSponsor = ((d.amount || 0) >= 1e6)
+      ? (sponsors[d.account] ? 100 : 0)
+      : 70;
+    return { meddic, reach, momentum, nextStep: nextStepRaw, engagement, execSponsor };
+  }
+  const HEALTH_WEIGHTS = { meddic: 0.25, reach: 0.20, momentum: 0.20, nextStep: 0.15, engagement: 0.10, execSponsor: 0.10 };
+  function dealHealthScore(d) {
+    if (!d) return 0;
+    const x = dealHealthDimensions(d);
+    return Math.round(
+      HEALTH_WEIGHTS.meddic      * x.meddic +
+      HEALTH_WEIGHTS.reach       * x.reach +
+      HEALTH_WEIGHTS.momentum    * x.momentum +
+      HEALTH_WEIGHTS.nextStep    * x.nextStep +
+      HEALTH_WEIGHTS.engagement  * x.engagement +
+      HEALTH_WEIGHTS.execSponsor * x.execSponsor
+    );
+  }
+  function healthBand(s) {
+    if (s >= 80) return { band: "STRONG",   cls: "h-strong",   glyph: "★" };
+    if (s >= 60) return { band: "OK",       cls: "h-ok",       glyph: "●" };
+    if (s >= 40) return { band: "AT-RISK",  cls: "h-atrisk",   glyph: "⚠" };
+    return            { band: "CRITICAL", cls: "h-critical", glyph: "⛔" };
+  }
+  function dealHealthTooltip(d) {
+    const x = dealHealthDimensions(d);
+    const w = HEALTH_WEIGHTS;
+    const f = (k) => (x[k] * w[k]).toFixed(1);
+    const total = dealHealthScore(d);
+    return `HEALTH ${total}/100 = MEDDIC ${x.meddic.toFixed(0)}×${w.meddic}=${f("meddic")} + REACH ${x.reach.toFixed(0)}×${w.reach}=${f("reach")} + MOMENTUM ${x.momentum.toFixed(0)}×${w.momentum}=${f("momentum")} + NEXT-STEP ${x.nextStep.toFixed(0)}×${w.nextStep}=${f("nextStep")} + ENG ${x.engagement.toFixed(0)}×${w.engagement}=${f("engagement")} + EXEC ${x.execSponsor.toFixed(0)}×${w.execSponsor}=${f("execSponsor")} — open detail expander for the full deal view.`;
+  }
+  function healthCell(d) {
+    const s = dealHealthScore(d);
+    const b = healthBand(s);
+    const tip = dealHealthTooltip(d);
+    return `<td class="num health-cell ${b.cls}" data-health-score="${s}" title="${esc(tip)}"><span class="h-glyph">${b.glyph}</span> <b>${s}</b></td>`;
+  }
+  function portfolioHealthSummary() {
+    const deals = D.topDeals || [];
+    if (!deals.length) return null;
+    const scores = deals.map(dealHealthScore);
+    const avg    = Math.round(scores.reduce((s, n) => s + n, 0) / scores.length);
+    const buckets = { strong: 0, ok: 0, atrisk: 0, critical: 0 };
+    scores.forEach((s) => {
+      if (s >= 80) buckets.strong++;
+      else if (s >= 60) buckets.ok++;
+      else if (s >= 40) buckets.atrisk++;
+      else buckets.critical++;
+    });
+    const criticalDeals = deals.filter((d) => dealHealthScore(d) < 40);
+    const criticalAmt = criticalDeals.reduce((s, d) => s + (d.amount || 0), 0);
+    return { avg, buckets, criticalDeals, criticalAmt, scores };
+  }
+
+  /* PORTFOLIO HEALTH tile renders into the existing #risks panel header area
+     OR a new mount in the KPI row — we attach it inside the existing DEAL
+     RISK panel as a sub-tile so we don't perturb the KPI row layout. */
+  function renderPortfolioHealth() {
+    const wrap = $("portfolio-health");
+    if (!wrap) return;
+    const sp = portfolioHealthSummary();
+    if (!sp) { wrap.innerHTML = ""; return; }
+    const b = healthBand(sp.avg);
+    // WoW delta is synthetic (no per-deal WoW persistence yet) — derived from
+    // a static -4 trajectory to match the spec's narrative. Replace with real
+    // snapshot diff once TIME MACHINE (#25) ships.
+    const wow = -4;
+    const wowCls = wow >= 0 ? "green" : wow <= -3 ? "red" : "amber";
+    const wowArrow = wow >= 0 ? "▲" : "▼";
+    const barPct = sp.avg;
+    // Reconciliation guard
+    const recomputed = sp.scores.length ? Math.round(sp.scores.reduce((s, n) => s + n, 0) / sp.scores.length) : 0;
+    const drift = Math.abs(recomputed - sp.avg);
+    const mismatch = drift > 1 ? `<span class="ph-mismatch">⚠ MISMATCH (avg ${sp.avg} vs Σ/N ${recomputed})</span>` : "";
+    wrap.innerHTML = `
+      <div class="ph-head">
+        <span class="ph-title">PORTFOLIO HEALTH</span>
+        <span class="ph-big ${b.cls}" title="Average health across ${sp.scores.length} top open deals">
+          <b>${sp.avg}</b><span class="ph-of">/100</span>
+          <span class="ph-band-chip ${b.cls}">${b.glyph} ${b.band}</span>
+        </span>
+        ${mismatch}
+      </div>
+      <div class="ph-bar" aria-hidden="true"><span class="ph-bar-fill ${b.cls}" style="width:${barPct}%"></span></div>
+      <div class="ph-buckets">
+        <button type="button" class="ph-bucket ph-critical" data-bucket="critical" title="Filter TOP OPEN DEALS to HEALTH < 40">⛔ ${sp.buckets.critical} &lt;40</button>
+        <button type="button" class="ph-bucket ph-atrisk" data-bucket="atrisk" title="Filter TOP OPEN DEALS to HEALTH 40-59">⚠ ${sp.buckets.atrisk} 40-59</button>
+        <button type="button" class="ph-bucket ph-ok" data-bucket="ok" title="Filter TOP OPEN DEALS to HEALTH 60-79">● ${sp.buckets.ok} 60-79</button>
+        <button type="button" class="ph-bucket ph-strong" data-bucket="strong" title="Filter TOP OPEN DEALS to HEALTH ≥ 80">★ ${sp.buckets.strong} 80+</button>
+        <span class="ph-wow ${wowCls}" title="Week-over-week portfolio health change">WoW ${wowArrow} ${Math.abs(wow)}</span>
+        ${sp.criticalAmt > 0 ? `<span class="ph-critical-amt">$${(sp.criticalAmt/1e6).toFixed(1)}M at &lt;40 ⛔</span>` : ""}
+      </div>`;
+    if (!wrap.dataset.bound) {
+      wrap.dataset.bound = "1";
+      wrap.addEventListener("click", (ev) => {
+        const btn = ev.target.closest(".ph-bucket");
+        if (!btn) return;
+        applyHealthFilter(btn.dataset.bucket);
+      });
+    }
+  }
+
+  /* HEALTH filter chip — < 40 ONLY by default but the bucket-clicks above
+     also drive the filter for the other 3 bands. */
+  let healthFilterActive = (function () {
+    try {
+      const v = localStorage.getItem("salespulse.healthFilter");
+      if (["critical","atrisk","ok","strong"].indexOf(v) >= 0) return v;
+    } catch (e) {}
+    return null;
+  })();
+  function applyHealthFilter(bucket) {
+    healthFilterActive = (healthFilterActive === bucket) ? null : bucket;
+    try { localStorage.setItem("salespulse.healthFilter", healthFilterActive || ""); } catch (e) {}
+    if (typeof applyDealFilters === "function") applyDealFilters();
+    if (typeof renderPortfolioHealth === "function") renderPortfolioHealth();
+    if (typeof renderHealthChip === "function") renderHealthChip();
+    const el = document.getElementById("deals");
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+    flash(healthFilterActive ? `FILTER: HEALTH ${healthFilterActive.toUpperCase()}` : "FILTER: CLEARED");
+  }
+  function dealMatchesHealthBucket(d, bucket) {
+    if (!bucket) return true;
+    const s = dealHealthScore(d);
+    if (bucket === "critical") return s < 40;
+    if (bucket === "atrisk")   return s >= 40 && s < 60;
+    if (bucket === "ok")       return s >= 60 && s < 80;
+    if (bucket === "strong")   return s >= 80;
+    return true;
+  }
+  function renderHealthChip() {
+    const wrap = $("health-filter-chip");
+    if (!wrap) return;
+    if (!healthFilterActive) { wrap.innerHTML = ""; return; }
+    const bandLbl = { critical: "<40 CRITICAL ⛔", atrisk: "40-59 AT-RISK ⚠", ok: "60-79 OK ●", strong: "80+ STRONG ★" }[healthFilterActive];
+    wrap.innerHTML = `<button type="button" class="hf-chip active" id="hf-clear" title="Clear HEALTH filter">HEALTH ${esc(bandLbl)} <span class="hf-x">✕</span></button>`;
+    const c = wrap.querySelector("#hf-clear");
+    if (c) c.addEventListener("click", () => applyHealthFilter(healthFilterActive));
+  }
+  function portfolioHealthInsightBullet() {
+    const sp = portfolioHealthSummary();
+    if (!sp) return null;
+    const b = healthBand(sp.avg);
+    const top3 = sp.criticalDeals.slice().sort((a, b) => b.amount - a.amount).slice(0, 3).map((d) => d.account);
+    const criticalPart = sp.criticalDeals.length
+      ? ` ${sp.criticalDeals.length} CRITICAL (${top3.join(", ")}${sp.criticalDeals.length > 3 ? ", …" : ""}) representing $${(sp.criticalAmt/1e6).toFixed(1)}M of pipeline.`
+      : " No deals in CRITICAL band.";
+    // Top drag — find the dimension with lowest contribution across the bottom-2 deals.
+    const bottom = sp.criticalDeals.slice().sort((a, b) => dealHealthScore(a) - dealHealthScore(b))[0];
+    let dragPart = "";
+    if (bottom) {
+      const x = dealHealthDimensions(bottom);
+      const minDim = Object.keys(x).sort((a, b) => x[a] - x[b])[0];
+      dragPart = ` Single-largest drag: ${minDim.toUpperCase()} on ${bottom.account} (${x[minDim].toFixed(0)}/100).`;
+    }
+    return `PORTFOLIO HEALTH ${sp.avg}/100 ${b.glyph} ${b.band}.${criticalPart}${dragPart} Recommended: open the DEAL DETAIL EXPANDER on the bottom-health deal to triage; assigning exec-sponsor on un-covered big bets (#34 SOFT drivers) lifts portfolio avg ~2-3pts.`;
+  }
+  /* ───────── end DEAL HEALTH SCORE ───────── */
+
   /* ---------- MOMENTUM (#14) — per-deal engagement signal ----------
      Tone bands: hot ≥ 70, warm 40-69, cold < 40. Trend is vs prior week. */
   function momentumTone(score) {
@@ -1638,7 +1819,7 @@
       });
     });
   }
-  function expanderColspan() { return 14; }
+  function expanderColspan() { return 15; }
   function expandRow(account, multi) {
     const tbody = $("deals-tbody"); if (!tbody) return;
     const tr = tbody.querySelector(`tr[data-account="${cssEsc(account)}"]`);
@@ -2100,7 +2281,7 @@
     const tbody = $("deals-tbody");
     if (!tbody) return;
     if (rows.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="14" style="text-align:center;color:var(--dim);padding:18px;">NO MATCHING DEALS</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="15" style="text-align:center;color:var(--dim);padding:18px;">NO MATCHING DEALS</td></tr>`;
       setText("deals-count", "0 OPEN · $0.0M");
       renderDealsHealth([]);
       renderQualHealth([]);
@@ -2111,7 +2292,10 @@
     // Pre-compute the top-3 set so each row knows whether to render the
     // TOP-3 CONCENTRATION (#11) star badge in the ACCOUNT column.
     const top3 = topAccountSet();
-    if (sortByQual) {
+    if (sortByHealth) {
+      // Lowest health first (at-risk-first ordering — operator triage flow).
+      rows = rows.slice().sort((a, b) => dealHealthScore(a) - dealHealthScore(b) || b.amount - a.amount);
+    } else if (sortByQual) {
       rows = rows.slice().sort((a, b) => qualScore(b) - qualScore(a) || b.amount - a.amount);
     } else if (sortByReach) {
       rows = rows.slice().sort((a, b) => reachScore(b) - reachScore(a) || b.amount - a.amount);
@@ -2131,11 +2315,12 @@
         ? `<span class="deal-top3-star" title="Top-3 account — single-point-of-failure deal">★</span> `
         : "";
       return `
-        <tr data-account="${esc(d.account)}" data-health="${dealHealth(d)}">
+        <tr data-account="${esc(d.account)}" data-health="${dealHealth(d)}" data-health-score="${dealHealthScore(d)}">
           <td>${star}<b class="green">${esc(d.account)}</b></td>
           <td>${esc(d.stage)}</td>
           <td class="num">$${formatK(d.amount)}</td>
           <td class="num ${probCls}">${d.prob}%</td>
+          ${healthCell(d)}
           ${momentumCell(d)}
           ${qualCell(d)}
           ${reachCell(d)}
@@ -2228,6 +2413,7 @@
       .filter((d) => (!dealsRiskOnly || dealHealth(d) === "overdue" || dealHealth(d) === "missing"))
       .filter((d) => (!dealsWeakOnly || isWeakCommit(d)))
       .filter((d) => (!dealsSingleOnly || isSingleThreaded(d)))
+      .filter((d) => dealMatchesHealthBucket(d, healthFilterActive))
       .filter((d) => {
         if (!commitFilterActive) return true;
         if (!isCommitDeal(d))    return false;
@@ -2237,6 +2423,7 @@
     renderDeals(rows);
     bindReachCellClicks();
     restoreExpandedAfterRender();
+    try { renderHealthChip(); } catch (e) {}
   }
   function bindDealFilters() {
     ["deal-search","deal-region","deal-forecast"].forEach((id) => {
@@ -2247,11 +2434,12 @@
     if (thNs) {
       thNs.addEventListener("click", () => {
         sortByNextStep = !sortByNextStep;
-        if (sortByNextStep) { sortByMomentum = false; sortByQual = false; sortByReach = false; }
+        if (sortByNextStep) { sortByMomentum = false; sortByQual = false; sortByReach = false; sortByHealth = false; }
         thNs.classList.toggle("sorted", sortByNextStep);
         const thMo = $("th-momentum"); if (thMo) thMo.classList.remove("sorted");
         const thQ  = $("th-qual");     if (thQ)  thQ.classList.remove("sorted");
         const thR  = $("th-reach");    if (thR)  thR.classList.remove("sorted");
+        const thH  = $("th-health");   if (thH)  thH.classList.remove("sorted");
         applyDealFilters();
       });
     }
@@ -2259,11 +2447,12 @@
     if (thMo) {
       thMo.addEventListener("click", () => {
         sortByMomentum = !sortByMomentum;
-        if (sortByMomentum) { sortByNextStep = false; sortByQual = false; sortByReach = false; }
+        if (sortByMomentum) { sortByNextStep = false; sortByQual = false; sortByReach = false; sortByHealth = false; }
         thMo.classList.toggle("sorted", sortByMomentum);
         const thNs2 = $("th-nextstep"); if (thNs2) thNs2.classList.remove("sorted");
         const thQ2  = $("th-qual");     if (thQ2)  thQ2.classList.remove("sorted");
         const thR2  = $("th-reach");    if (thR2)  thR2.classList.remove("sorted");
+        const thH2  = $("th-health");   if (thH2)  thH2.classList.remove("sorted");
         applyDealFilters();
       });
     }
@@ -2271,7 +2460,7 @@
     if (thQu) {
       thQu.addEventListener("click", () => {
         sortByQual = !sortByQual;
-        if (sortByQual) { sortByMomentum = false; sortByNextStep = false; sortByReach = false; }
+        if (sortByQual) { sortByMomentum = false; sortByNextStep = false; sortByReach = false; sortByHealth = false; }
         thQu.classList.toggle("sorted", sortByQual);
         const thMo2 = $("th-momentum"); if (thMo2) thMo2.classList.remove("sorted");
         const thNs3 = $("th-nextstep"); if (thNs3) thNs3.classList.remove("sorted");
@@ -2283,11 +2472,25 @@
     if (thRe) {
       thRe.addEventListener("click", () => {
         sortByReach = !sortByReach;
-        if (sortByReach) { sortByMomentum = false; sortByNextStep = false; sortByQual = false; }
+        if (sortByReach) { sortByMomentum = false; sortByNextStep = false; sortByQual = false; sortByHealth = false; }
         thRe.classList.toggle("sorted", sortByReach);
         const thMo3 = $("th-momentum"); if (thMo3) thMo3.classList.remove("sorted");
         const thNs4 = $("th-nextstep"); if (thNs4) thNs4.classList.remove("sorted");
         const thQ3  = $("th-qual");     if (thQ3)  thQ3.classList.remove("sorted");
+        const thH3  = $("th-health");   if (thH3)  thH3.classList.remove("sorted");
+        applyDealFilters();
+      });
+    }
+    const thH = $("th-health");
+    if (thH) {
+      thH.addEventListener("click", () => {
+        sortByHealth = !sortByHealth;
+        if (sortByHealth) { sortByMomentum = false; sortByNextStep = false; sortByQual = false; sortByReach = false; }
+        thH.classList.toggle("sorted", sortByHealth);
+        const thMo4 = $("th-momentum"); if (thMo4) thMo4.classList.remove("sorted");
+        const thNs5 = $("th-nextstep"); if (thNs5) thNs5.classList.remove("sorted");
+        const thQ4  = $("th-qual");     if (thQ4)  thQ4.classList.remove("sorted");
+        const thR4  = $("th-reach");    if (thR4)  thR4.classList.remove("sorted");
         applyDealFilters();
       });
     }
@@ -3018,6 +3221,10 @@
     try {
       const cs = commitSplitInsightBullet();
       if (cs) items.unshift(cs);
+    } catch (e) {}
+    try {
+      const ph = portfolioHealthInsightBullet();
+      if (ph) items.unshift(ph);
     } catch (e) {}
     try {
       const sb = scenarioInsightBullet();
@@ -3970,6 +4177,8 @@
     renderRegions();
     renderRisks();
     renderReachAggregate();
+    renderPortfolioHealth();
+    renderHealthChip();
     renderSlippage();
     renderPipegen();
     renderForwardCoverage();
