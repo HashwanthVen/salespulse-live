@@ -928,6 +928,9 @@
     }
     // Refresh hero strip to incorporate the projection.
     renderHeroSummary({ commit: commitLast, best: bestLast, quota: target, projCommit: projCommitMid, projBand: acc });
+    // EARNED vs SOFT split (#34) — recomputed every chart render so the split
+    // mirrors the active series + motion lens. Uses commit total, not series.
+    renderCommitSplit(commitLast);
   }
 
   // Hero summary is re-rendered every time the chart renders so projection
@@ -960,6 +963,195 @@
       })() +
       ".";
   }
+
+  /* ───────── EARNED vs SOFT COMMIT (#34) ─────────
+     CFO/Board's "what can I count on?" answer. A deal contributes to EARNED
+     only if it passes ALL gates: MEDDIC >= 6, REACH >= 0.5, momentum stable
+     (engagement.score >= 50), in Negotiation/Closed Won, next-step healthy.
+     SOFT = the rest of the commit. Together they equal the displayed commit
+     value within ±$0.1M (reconciliation guard). For deals < $1M the
+     execSponsor gate is auto-passed; ≥ $1M requires explicit sponsor.
+     Formula is intentionally documented + auditable — the CFO will ask
+     "how is this computed?" and the tooltip on the bar shows the math. */
+
+  function isCommitDeal(d) {
+    return (d.forecast || "").toLowerCase() === "commit";
+  }
+  function isEarnedDeal(d) {
+    if (!d) return false;
+    const meddic   = qualScore(d);
+    const reach    = reachScore(d);
+    const stageOK  = d.stage === "Negotiation" || d.stage === "Closed Won";
+    const nsStatus = dealHealth(d);
+    const nsOK     = nsStatus !== "missing" && nsStatus !== "overdue";
+    const momOK    = (d.engagement && typeof d.engagement.score === "number") ? d.engagement.score >= 50 : false;
+    const sponsors = (D.dealExecSponsors || {});
+    const execOK   = ((d.amount || 0) >= 1e6) ? !!sponsors[d.account] : true;
+    return meddic >= 6 && reach >= 0.5 && momOK && stageOK && nsOK && execOK;
+  }
+  function earnedFailReasons(d) {
+    const meddic   = qualScore(d);
+    const reach    = reachScore(d);
+    const stageOK  = d.stage === "Negotiation" || d.stage === "Closed Won";
+    const nsStatus = dealHealth(d);
+    const nsOK     = nsStatus !== "missing" && nsStatus !== "overdue";
+    const momOK    = (d.engagement && typeof d.engagement.score === "number") ? d.engagement.score >= 50 : false;
+    const sponsors = (D.dealExecSponsors || {});
+    const execOK   = ((d.amount || 0) >= 1e6) ? !!sponsors[d.account] : true;
+    const reasons = [];
+    if (meddic < 6) reasons.push("meddic");
+    if (reach  < 0.5) reasons.push("reach");
+    if (!momOK)       reasons.push("momentum");
+    if (!nsOK)        reasons.push("nextstep");
+    if (!stageOK)     reasons.push("stage");
+    if (!execOK)      reasons.push("execsponsor");
+    return reasons;
+  }
+  function weightedAmt(d) {
+    return ((d.amount || 0) / 1e6) * ((d.prob || 0) / 100);
+  }
+  function computeCommitSplit(commitTotal) {
+    // Compute the EARNED ratio from the TOP OPEN DEALS classified pool, then
+    // apply that ratio to the displayed commit total. This keeps the split
+    // reconcilable to the chart even though pipeline > topDeals.
+    const deals     = (D.topDeals || []).filter(isCommitDeal);
+    const totW      = deals.reduce((s, d) => s + weightedAmt(d), 0);
+    const earnedDeals = deals.filter(isEarnedDeal);
+    const softDeals   = deals.filter((d) => !isEarnedDeal(d));
+    const earnedW   = earnedDeals.reduce((s, d) => s + weightedAmt(d), 0);
+    const softW     = softDeals.reduce((s, d) => s + weightedAmt(d), 0);
+    const earnedRatio = totW > 0 ? earnedW / totW : 0.65;
+    const earnedM   = commitTotal * earnedRatio;
+    const softM     = commitTotal * (1 - earnedRatio);
+    // Fail-driver tallies (deals can fail multiple — totals overlap).
+    const drivers = { meddic: { n: 0, m: 0 }, reach: { n: 0, m: 0 }, momentum: { n: 0, m: 0 }, nextstep: { n: 0, m: 0 }, stage: { n: 0, m: 0 }, execsponsor: { n: 0, m: 0 } };
+    softDeals.forEach((d) => {
+      earnedFailReasons(d).forEach((r) => {
+        drivers[r].n += 1;
+        drivers[r].m += weightedAmt(d);
+      });
+    });
+    return { commit: commitTotal, earned: earnedM, soft: softM, earnedRatio, deals, earnedDeals, softDeals, drivers };
+  }
+
+  function commitSplitBenchTier() {
+    const b = D.benchmarks && D.benchmarks.kpis && D.benchmarks.kpis.earnedCommitRatio;
+    if (!b) return null;
+    return b;
+  }
+
+  function renderCommitSplit(commitTotal) {
+    const wrap = $("commit-split");
+    if (!wrap) return;
+    if (!commitTotal || commitTotal <= 0) { wrap.innerHTML = ""; return; }
+    const sp = computeCommitSplit(commitTotal);
+    const earnedPct = Math.round(sp.earnedRatio * 100);
+    const softPct   = 100 - earnedPct;
+    const bench = commitSplitBenchTier();
+    let benchWhisper = "";
+    if (bench) {
+      const tier = sp.earnedRatio >= bench.p75 ? { lbl: "P75 ★ top quartile", cls: "green" }
+                 : sp.earnedRatio >= bench.p50 ? { lbl: "P50 · at median",    cls: "amber" }
+                 : sp.earnedRatio >= bench.p25 ? { lbl: "P40 ⚠ below median", cls: "amber" }
+                 : { lbl: "P25 ⛔ bottom quartile", cls: "red" };
+      benchWhisper = `<span class="cs-bench ${tier.cls}" title="Pavilion SaaS Operator Benchmarks · ${(bench.p25*100).toFixed(0)}% / ${(bench.p50*100).toFixed(0)}% / ${(bench.p75*100).toFixed(0)}% quartiles">EARNED ${earnedPct}% · ${tier.lbl}</span>`;
+    }
+    // Reconciliation guard
+    const sum = sp.earned + sp.soft;
+    const drift = Math.abs(sum - sp.commit);
+    const mismatch = drift > 0.1
+      ? `<span class="cs-mismatch">⚠ MISMATCH (earned $${sp.earned.toFixed(1)}M + soft $${sp.soft.toFixed(1)}M = $${sum.toFixed(1)}M vs commit $${sp.commit.toFixed(1)}M)</span>`
+      : "";
+    const tip = `EARNED gates per deal (ALL must pass):\n  • MEDDIC ≥ 6 / 8\n  • REACH ≥ 0.5 (multi-threaded buying group)\n  • engagement score ≥ 50 (momentum stable)\n  • Stage = Negotiation or Closed Won\n  • Next-step status = on-track or stale (not missing/overdue)\n  • Exec sponsor assigned if amount ≥ $1M\nSOFT = everything in commit category that fails ≥ 1 gate. earnedRatio computed from top open deals' weighted amounts; applied to displayed commit total to reconcile.`;
+    const drivOrder = [
+      { k: "meddic",      lbl: "MEDDIC < 6",          tag: "QUAL" },
+      { k: "reach",       lbl: "REACH < 0.5",         tag: "REACH" },
+      { k: "momentum",    lbl: "MOMENTUM < 50",       tag: "MOMENTUM" },
+      { k: "nextstep",    lbl: "NEXT-STEP missing",   tag: "NEXTSTEP" },
+      { k: "stage",       lbl: "Stage < Negotiation", tag: "STAGE" },
+      { k: "execsponsor", lbl: "EXEC sponsor missing", tag: "EXEC" }
+    ];
+    const drivers = drivOrder.filter((o) => sp.drivers[o.k].n > 0).sort((a, b) => sp.drivers[b.k].m - sp.drivers[a.k].m);
+    const drivHTML = drivers.length === 0
+      ? `<span class="cs-empty">— no SOFT drivers (all commit deals earned)</span>`
+      : drivers.map((o) => {
+          const d = sp.drivers[o.k];
+          return `<button type="button" class="cs-driver" data-driver="${esc(o.k)}" title="Click → highlight deals failing this gate">${esc(o.lbl)}: ${d.n} ${d.n === 1 ? "deal" : "deals"} ($${d.m.toFixed(1)}M)</button>`;
+        }).join("");
+    wrap.innerHTML = `
+      <div class="cs-head">
+        <span class="cs-title">COMMIT $${sp.commit.toFixed(1)}M = EARNED $${sp.earned.toFixed(1)}M (${earnedPct}%) <span class="cs-glyph cs-good">●</span> + SOFT $${sp.soft.toFixed(1)}M (${softPct}%) <span class="cs-glyph cs-warn">⚠</span></span>
+        ${benchWhisper}
+        ${mismatch}
+      </div>
+      <div class="cs-bar" role="img" aria-label="EARNED ${earnedPct} percent, SOFT ${softPct} percent" title="${esc(tip)}">
+        <button type="button" class="cs-seg cs-earned" data-bucket="earned" style="flex:${earnedPct}" title="${esc(tip)}" aria-label="Filter TOP OPEN DEALS to earned"><span class="cs-seg-lbl">EARNED $${sp.earned.toFixed(1)}M · ${earnedPct}%</span></button>
+        <button type="button" class="cs-seg cs-soft"   data-bucket="soft"   style="flex:${softPct}"   title="${esc(tip)}" aria-label="Filter TOP OPEN DEALS to soft"><span class="cs-seg-lbl">SOFT $${sp.soft.toFixed(1)}M · ${softPct}%</span></button>
+      </div>
+      <div class="cs-drivers" aria-label="SOFT commit failure drivers — click to highlight failing deals">
+        <span class="cs-drivers-lbl">SOFT drivers:</span>
+        ${drivHTML}
+      </div>`;
+    if (!wrap.dataset.bound) {
+      wrap.dataset.bound = "1";
+      wrap.addEventListener("click", (ev) => {
+        const seg = ev.target.closest(".cs-seg");
+        if (seg) { applyCommitFilter(seg.dataset.bucket); return; }
+        const drv = ev.target.closest(".cs-driver");
+        if (drv) { highlightCommitDriver(drv.dataset.driver); return; }
+      });
+    }
+  }
+
+  let commitFilterActive = (function () {
+    try {
+      const v = localStorage.getItem("salespulse.commitFilter");
+      if (v === "earned" || v === "soft") return v;
+    } catch (e) {}
+    return null;
+  })();
+  function applyCommitFilter(bucket) {
+    commitFilterActive = (commitFilterActive === bucket) ? null : bucket;
+    try { localStorage.setItem("salespulse.commitFilter", commitFilterActive || ""); } catch (e) {}
+    if (typeof applyDealFilters === "function") applyDealFilters();
+    const el = document.getElementById("deals");
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+    flash(commitFilterActive ? `FILTER: ${commitFilterActive.toUpperCase()} COMMIT DEALS` : "FILTER: CLEARED");
+  }
+  function highlightCommitDriver(driver) {
+    const deals = (D.topDeals || []).filter((d) => isCommitDeal(d) && !isEarnedDeal(d) && earnedFailReasons(d).indexOf(driver) >= 0);
+    if (deals.length === 0) { flash("NO DEALS"); return; }
+    const tbody = $("deals-tbody");
+    if (!tbody) return;
+    const el = document.getElementById("deals");
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+    deals.forEach((d) => {
+      const tr = tbody.querySelector(`tr[data-account="${cssEsc(d.account)}"]`);
+      if (tr) { tr.classList.remove("highlight-pulse"); void tr.offsetWidth; tr.classList.add("highlight-pulse"); }
+    });
+    flash(`HIGHLIGHTED ${deals.length} DEAL${deals.length === 1 ? "" : "S"} FAILING ${driver.toUpperCase()}`);
+  }
+
+  function commitSplitInsightBullet() {
+    if (!D.topDeals || !D.topDeals.length) return null;
+    const commitTotal = (D.trend && D.trend.commit && D.trend.commit[D.trend.commit.length - 1]) || 0;
+    if (commitTotal <= 0) return null;
+    const sp = computeCommitSplit(commitTotal);
+    const earnedPct = Math.round(sp.earnedRatio * 100);
+    const bench = commitSplitBenchTier();
+    const benchPart = bench
+      ? ` Earned ratio at ${(sp.earnedRatio*100).toFixed(0)}% vs Pavilion P50=${(bench.p50*100).toFixed(0)}% — ${sp.earnedRatio >= bench.p50 ? "above" : "below"} median.`
+      : "";
+    // Top SOFT driver
+    const drivOrder = ["meddic","reach","momentum","nextstep","stage","execsponsor"];
+    const top = drivOrder.map((k) => ({ k, m: sp.drivers[k].m, n: sp.drivers[k].n })).filter((o) => o.n > 0).sort((a, b) => b.m - a.m)[0];
+    const driverPart = top
+      ? ` Top SOFT driver: ${top.n} ${top.n === 1 ? "deal" : "deals"} failing ${top.k.toUpperCase()} ($${top.m.toFixed(1)}M weighted) — the largest forecast confidence gap.`
+      : "";
+    return `COMMIT split: $${sp.earned.toFixed(1)}M EARNED (${earnedPct}%) + $${sp.soft.toFixed(1)}M SOFT (${100-earnedPct}%).${benchPart}${driverPart} If all SOFT slipped: commit drops to $${sp.earned.toFixed(1)}M (${((sp.earned/((D.meta&&D.meta.quotaQ)||60)*100)).toFixed(0)}% attain). Recommended: upgrade SOFT → EARNED via exec-sponsor push on big bets.`;
+  }
+  /* ───────── end EARNED vs SOFT COMMIT ───────── */
+
   function bindToggle() {
     document.querySelectorAll(".toggle").forEach((btn) => {
       btn.addEventListener("click", () => setSeries(btn.dataset.series));
@@ -2036,6 +2228,11 @@
       .filter((d) => (!dealsRiskOnly || dealHealth(d) === "overdue" || dealHealth(d) === "missing"))
       .filter((d) => (!dealsWeakOnly || isWeakCommit(d)))
       .filter((d) => (!dealsSingleOnly || isSingleThreaded(d)))
+      .filter((d) => {
+        if (!commitFilterActive) return true;
+        if (!isCommitDeal(d))    return false;
+        return commitFilterActive === "earned" ? isEarnedDeal(d) : !isEarnedDeal(d);
+      })
       .sort((a, b) => b.amount - a.amount);
     renderDeals(rows);
     bindReachCellClicks();
@@ -2817,6 +3014,10 @@
     try {
       const bb = benchmarkInsightBullet();
       if (bb) items.unshift(bb);
+    } catch (e) {}
+    try {
+      const cs = commitSplitInsightBullet();
+      if (cs) items.unshift(cs);
     } catch (e) {}
     try {
       const sb = scenarioInsightBullet();

@@ -142,7 +142,8 @@ window.SALESPULSE_DATA = {
       forecastAccuracy:  { label: "FCST ACC",    p25: 0.12, p50: 0.08, p75: 0.05,  ours: 0.051, ourLabel: "±5.1%", fmt: "pct",  hib: false, pct: 74, kpiKey: null },
       pipegenToQuota:    { label: "PIPEGEN",     p25: 0.18, p50: 0.24, p75: 0.32,  ours: 0.21,  ourLabel: "21%",   fmt: "pct",  hib: true,  pct: 34, kpiKey: null },
       mktSourceShare:    { label: "MKT SOURCE",  p25: 0.25, p50: 0.32, p75: 0.41,  ours: 0.38,  ourLabel: "38%",   fmt: "pct",  hib: true,  pct: 65, kpiKey: null },
-      qualifiedNewLogos: { label: "NEW LOGOS",   p25: 4,    p50: 7,    p75: 12,    ours: 6,     ourLabel: "6",     fmt: "int",  hib: true,  pct: 40, kpiKey: null }
+      qualifiedNewLogos: { label: "NEW LOGOS",   p25: 4,    p50: 7,    p75: 12,    ours: 6,     ourLabel: "6",     fmt: "int",  hib: true,  pct: 40, kpiKey: null },
+      earnedCommitRatio: { label: "EARNED %",    p25: 0.55, p50: 0.70, p75: 0.82,  ours: 0.65,  ourLabel: "65%",   fmt: "pct",  hib: true,  pct: 40, kpiKey: null }
     }
   },
 
@@ -206,6 +207,19 @@ window.SALESPULSE_DATA = {
     { account: "Trey Research",          stage: "Proposal",     amount:  420000, prob: 55, close: "2026-07-18", owner: "L. Patel",    forecast: "bestcase", region: "EMEA", segment: "Mid-Market",  motion: "expansion", nextStep: { action: "Pricing approval",      dueDate: "2026-06-13", daysFromNow:  1 }, engagement: { score: 76, lastTouchDays:  3, touchpoints14d:  7, multiThreaded: true,  trend: "up"   }, meddic: { M: true,  E: true,  D1: true,  D2: false, I: true,  C: false, P: false, Cm: true  }, reach: { champion: 2, economicBuyer: 2, decisionMaker: 1, influencer: 2, techEvaluator: 2 } },
     { account: "Graphic Design Inst.",   stage: "Negotiation",  amount:  380000, prob: 85, close: "2026-06-20", owner: "M. Chen",     forecast: "commit",   region: "APAC", segment: "SMB",         motion: "new",       nextStep: { action: "Demo with CTO",         dueDate: "2026-06-15", daysFromNow:  3 }, engagement: { score: 85, lastTouchDays:  2, touchpoints14d:  9, multiThreaded: true,  trend: "up"   }, meddic: { M: true,  E: true,  D1: true,  D2: true,  I: true,  C: true,  P: false, Cm: true  }, reach: { champion: 2, economicBuyer: 2, decisionMaker: 2, influencer: 2, techEvaluator: 2 } }
   ],
+
+  /* Per-deal EXEC SPONSOR coverage (#33 DEAL HEALTH SCORE + #34 EARNED vs
+     SOFT COMMIT). Mapped by account so the deal rows stay one-liner-readable.
+     Only deals ≥ $1M materially need an exec sponsor (Pavilion data: +12%
+     win-rate lift on big bets) — smaller deals default to "n/a". Story:
+     Northwind + Fabrikam are unassigned (the big-bet coverage gap that
+     SCENARIO MODELER lever exposes); Contoso + Adventure Works are covered. */
+  dealExecSponsors: {
+    "Northwind Industries":  false,
+    "Contoso Manufacturing": true,
+    "Fabrikam Logistics":    false,
+    "Adventure Works":       true
+  },
 
   /* nextStep meta — daysFromNow is computed against meta.asOf (Jun 12, 2026) at
      data-author time so render is trivial; in a real system this would be live.

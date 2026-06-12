@@ -2078,3 +2078,116 @@ main.lens-board tr.expander-row { display: none; }
   .scn-arrow { display: none; }
   #scenario .panel-head .right.scenario-presets { flex-wrap: wrap; row-gap: 4px; }
 }
+
+
+
+/* ---------- EARNED vs SOFT COMMIT (#34) ----------
+   Horizontal stacked bar + driver chips at the bottom of FORECAST panel.
+   No new colors — uses --green / --amber / --red CSS vars. */
+.cs-wrap {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-top: 1px dashed var(--border, rgba(255,255,255,0.10));
+  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  font-size: 11.5px;
+  color: var(--text, #c9d1d9);
+}
+.cs-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+.cs-title { letter-spacing: 0.4px; font-weight: 600; }
+.cs-glyph.cs-good { color: var(--green); }
+.cs-glyph.cs-warn { color: var(--amber); }
+.cs-bench {
+  margin-left: auto;
+  padding: 1px 6px;
+  font-size: 10.5px;
+  border: 1px solid currentColor;
+  border-radius: 2px;
+  opacity: 0.95;
+}
+.cs-bench.green { color: var(--green); }
+.cs-bench.amber { color: var(--amber); }
+.cs-bench.red   { color: var(--red); }
+.cs-mismatch {
+  margin-left: 6px;
+  padding: 1px 6px;
+  font-size: 10px;
+  color: var(--amber);
+  border: 1px solid rgba(210,153,34,0.40);
+  border-radius: 2px;
+  background: rgba(210,153,34,0.06);
+}
+
+.cs-bar {
+  display: flex;
+  width: 100%;
+  height: 24px;
+  border: 1px solid var(--border, rgba(255,255,255,0.15));
+  border-radius: 2px;
+  overflow: hidden;
+  margin: 4px 0 8px;
+}
+.cs-seg {
+  background: transparent;
+  border: none;
+  color: inherit;
+  font-family: inherit;
+  font-size: 10.5px;
+  letter-spacing: 0.5px;
+  padding: 0 8px;
+  text-align: center;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: filter 120ms ease-out;
+  min-width: 0;
+  overflow: hidden;
+}
+.cs-seg-lbl { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cs-seg.cs-earned {
+  background: rgba(95,184,120,0.22);
+  color: var(--green);
+  font-weight: 700;
+  border-right: 1px solid var(--bg, #0d1117);
+}
+.cs-seg.cs-soft {
+  background: rgba(210,153,34,0.20);
+  color: var(--amber);
+  font-weight: 700;
+}
+.cs-seg:hover { filter: brightness(1.25); }
+.cs-seg:focus { outline: 1px solid currentColor; outline-offset: -1px; }
+
+.cs-drivers {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  font-size: 10.5px;
+}
+.cs-drivers-lbl { color: var(--dim); letter-spacing: 0.7px; }
+.cs-driver {
+  background: transparent;
+  border: 1px solid var(--border, rgba(255,255,255,0.15));
+  color: var(--amber);
+  font-family: inherit;
+  font-size: 10px;
+  letter-spacing: 0.3px;
+  padding: 2px 6px;
+  cursor: pointer;
+  border-radius: 2px;
+}
+.cs-driver:hover { color: var(--text); border-color: var(--text); }
+.cs-empty { color: var(--dim); font-style: italic; }
+
+@media (max-width: 480px) {
+  .cs-head { flex-direction: column; align-items: flex-start; }
+  .cs-bench { margin-left: 0; }
+  .cs-seg-lbl { font-size: 9.5px; }
+}
