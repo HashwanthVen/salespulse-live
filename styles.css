@@ -2356,3 +2356,82 @@ th#th-health.sorted { color: var(--green); }
   .team-attain-body .data-table td:nth-child(7) { display: none; }
   .mgr-cell { font-size: 10px; }
 }
+
+
+/* ==========================================================================
+   #35 PIPELINE EROSION FORECAST (v0.29)
+   ========================================================================== */
+.erosion-body { font-size: 11.5px; }
+.erosion-body .er-head { display: flex; justify-content: flex-end; margin-bottom: 8px; }
+.erosion-body .er-methodology-toggle {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10.5px; padding: 2px 8px; background: transparent;
+  border: 1px solid var(--border); color: var(--dim); cursor: pointer;
+  letter-spacing: 0.4px;
+}
+.erosion-body .er-methodology-toggle:hover { color: var(--text); border-color: var(--green); }
+.erosion-body .data-table { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
+.erosion-body .data-table th,
+.erosion-body .data-table td {
+  padding: 3px 8px; border-bottom: 1px solid var(--border); white-space: nowrap;
+}
+.erosion-body .data-table td.num { text-align: right; }
+.erosion-body .er-summary td { padding: 5px 8px; font-size: 12px; }
+.erosion-body .er-summary td:first-child { color: var(--dim); letter-spacing: 0.4px; font-size: 10.5px; text-transform: uppercase; }
+.erosion-body .er-summary td:nth-child(2) { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 14px; }
+.erosion-body .er-section-title {
+  font-size: 10.5px; letter-spacing: 0.6px; color: var(--dim);
+  text-transform: uppercase; margin: 14px 0 6px;
+  border-bottom: 1px solid var(--border); padding-bottom: 3px;
+}
+.erosion-body .er-quarters td,
+.erosion-body .er-stages td { padding: 3px 8px; }
+.erosion-body .er-bar code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px; letter-spacing: -1px; color: var(--green);
+  background: transparent;
+}
+.erosion-body .er-stage-row { cursor: pointer; transition: background 0.15s; }
+.erosion-body .er-stage-row:hover { background: rgba(255,255,255,0.025); }
+.erosion-body .er-bench {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px; color: var(--dim);
+}
+.erosion-body .er-flush {
+  margin-top: 12px; padding: 10px 12px;
+  border: 1px solid var(--amber); background: rgba(214,158,46,0.04);
+  cursor: pointer; transition: background 0.15s;
+  font-size: 11.5px; line-height: 1.6;
+}
+.erosion-body .er-flush:hover { background: rgba(214,158,46,0.10); }
+.erosion-body .er-flush b { color: var(--amber); }
+.erosion-body .er-flush-link {
+  display: inline-block; margin-top: 4px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px; color: var(--green); letter-spacing: 0.3px;
+}
+.erosion-body .er-mismatch {
+  display: inline-block; margin-top: 10px; padding: 2px 7px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10.5px; color: var(--amber); border: 1px solid var(--amber);
+}
+.erosion-body .er-methodology {
+  margin-top: 14px; padding: 10px 12px;
+  border: 1px solid var(--border); background: rgba(255,255,255,0.015);
+  font-size: 11px; line-height: 1.55;
+}
+.erosion-body .er-methodology p { margin: 4px 0; }
+.erosion-body .er-methodology code {
+  background: rgba(255,255,255,0.04); padding: 1px 4px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 10.5px;
+}
+#deals.pulse-soft { animation: er-pulse 1.5s ease-out; }
+@keyframes er-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(99,180,99,0.30); }
+  50% { box-shadow: 0 0 0 8px rgba(99,180,99,0); }
+  100% { box-shadow: 0 0 0 0 rgba(99,180,99,0); }
+}
+@media (max-width: 480px) {
+  .erosion-body .er-bar { display: none; }
+  .erosion-body .er-summary td:nth-child(2) { font-size: 12px; }
+  .erosion-body .er-quarters td:last-child { display: none; }
+}

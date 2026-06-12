@@ -143,7 +143,8 @@ window.SALESPULSE_DATA = {
       pipegenToQuota:    { label: "PIPEGEN",     p25: 0.18, p50: 0.24, p75: 0.32,  ours: 0.21,  ourLabel: "21%",   fmt: "pct",  hib: true,  pct: 34, kpiKey: null },
       mktSourceShare:    { label: "MKT SOURCE",  p25: 0.25, p50: 0.32, p75: 0.41,  ours: 0.38,  ourLabel: "38%",   fmt: "pct",  hib: true,  pct: 65, kpiKey: null },
       qualifiedNewLogos: { label: "NEW LOGOS",   p25: 4,    p50: 7,    p75: 12,    ours: 6,     ourLabel: "6",     fmt: "int",  hib: true,  pct: 40, kpiKey: null },
-      earnedCommitRatio: { label: "EARNED %",    p25: 0.55, p50: 0.70, p75: 0.82,  ours: 0.65,  ourLabel: "65%",   fmt: "pct",  hib: true,  pct: 40, kpiKey: null }
+      earnedCommitRatio: { label: "EARNED %",    p25: 0.55, p50: 0.70, p75: 0.82,  ours: 0.65,  ourLabel: "65%",   fmt: "pct",  hib: true,  pct: 40, kpiKey: null },
+      pipelineSurvival:  { label: "PIPE SURVIVAL", p25: 0.32, p50: 0.41, p75: 0.52, ours: 0.462, ourLabel: "46.2%", fmt: "pct",  hib: true,  pct: 58, kpiKey: null }
     }
   },
 
