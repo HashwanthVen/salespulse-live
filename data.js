@@ -43,7 +43,8 @@ window.SALESPULSE_DATA = {
     closedRisks: ["EMEA pipeline coverage below 2x"]
   },
 
-  /* Top-line KPIs */
+  /* Top-line KPIs (default = ALL motions). When the NEW vs EXPANSION lens
+     toggle is non-ALL, renderKpis() uses kpisByMotion[currentMotion] instead. */
   kpis: [
     { label: "Pipeline Value",      value: "$184.2M", delta: "+12.4%",    direction: "up",   tone: "good", note: "Total weighted + unweighted." },
     { label: "Weighted Pipeline",   value: "$58.7M",  delta: "+8.1%",     direction: "up",   tone: "good", note: "Probability-adjusted." },
@@ -53,16 +54,49 @@ window.SALESPULSE_DATA = {
     { label: "Pipeline Coverage",   value: "3.1x",    delta: "vs 3.0x target", direction: "flat", tone: "good", note: "Above 3x rule of thumb." }
   ],
 
+  /* NEW vs EXPANSION lens — when the motion toggle is set, renderKpis()
+     swaps the entire 6-tile snapshot for the matching motion. The two
+     snapshots intentionally diverge on win rate and sales cycle so the
+     strategic story (expansion is a higher-ROI, shorter-cycle motion) is
+     visible at a glance. */
+  kpisByMotion: {
+    new: [
+      { label: "Pipeline Value",      value: "$110.5M", delta: "+10.8%",   direction: "up",   tone: "good", note: "New logo (60% of overall pipeline)." },
+      { label: "Weighted Pipeline",   value: "$24.3M",  delta: "+6.2%",    direction: "up",   tone: "warn", note: "Low win rate drags weighted value down." },
+      { label: "Win Rate (TTM)",      value: "22.0%",   delta: "+0.8 pts", direction: "up",   tone: "warn", note: "New logo wins less; investment-heavy." },
+      { label: "Avg Deal Size",       value: "$118K",   delta: "-2.1%",    direction: "down", tone: "warn", note: "Smaller new-logo land deals." },
+      { label: "Sales Cycle",         value: "88 days", delta: "-2 days",  direction: "up",   tone: "warn", note: "Longer cycle for net-new buyers." },
+      { label: "Pipeline Coverage",   value: "3.6x",    delta: "vs 3.5x target", direction: "flat", tone: "good", note: "Need higher coverage for lower-win motion." }
+    ],
+    expansion: [
+      { label: "Pipeline Value",      value: "$73.7M",  delta: "+15.1%",   direction: "up",   tone: "good", note: "Expansion / upsell / renewal (40% of pipeline)." },
+      { label: "Weighted Pipeline",   value: "$34.4M",  delta: "+12.5%",   direction: "up",   tone: "good", note: "High win rate pulls weighted value up." },
+      { label: "Win Rate (TTM)",      value: "40.0%",   delta: "+2.4 pts", direction: "up",   tone: "good", note: "Existing customers convert ~2x new logo." },
+      { label: "Avg Deal Size",       value: "$185K",   delta: "-4.1%",    direction: "down", tone: "warn", note: "Larger ASP but discounting on renewals." },
+      { label: "Sales Cycle",         value: "42 days", delta: "-6 days",  direction: "up",   tone: "good", note: "Half the new-logo cycle — fast motion." },
+      { label: "Pipeline Coverage",   value: "2.5x",    delta: "vs 2.5x target", direction: "flat", tone: "good", note: "Less coverage needed at 40% win rate." }
+    ]
+  },
+
+  /* Headline NEW vs EXPANSION split used by the mini stacked-bar in the
+     PIPELINE BY SEGMENT panel. Shares sum to 100. */
+  motionSplit: {
+    new:       { value: 110.5, share: 60, winRate: 22 },
+    expansion: { value:  73.7, share: 40, winRate: 40 }
+  },
+
   /* Funnel stages — value at each stage + count + conversion to next.
      aging buckets show how long deals have been sitting in each stage; sums = count.
-     Closed Won is terminal so has no time-in-stage aging. */
+     Closed Won is terminal so has no time-in-stage aging.
+     motionMix breaks each stage's value into New Logo / Expansion shares —
+     expansion's share grows down the funnel because it converts better. */
   funnel: [
-    { stage: "Prospects",    value: 312.4, count: 1842, convPct: 38,   aging: { d0_14: 1100, d15_30: 540, d30_plus: 202 } },
-    { stage: "Qualified",    value: 184.6, count:  712, convPct: 52,   aging: { d0_14:  420, d15_30: 220, d30_plus:  72 } },
-    { stage: "Discovery",    value:  96.8, count:  402, convPct: 65,   aging: { d0_14:  210, d15_30: 130, d30_plus:  62 } },
-    { stage: "Proposal",     value:  62.4, count:  221, convPct: 58,   aging: { d0_14:  120, d15_30:  65, d30_plus:  36 } },
-    { stage: "Negotiation",  value:  35.8, count:  108, convPct: 71,   aging: { d0_14:   55, d15_30:  35, d30_plus:  18 } },
-    { stage: "Closed Won",   value:  25.4, count:   78, convPct: null, aging: null }
+    { stage: "Prospects",    value: 312.4, count: 1842, convPct: 38,   aging: { d0_14: 1100, d15_30: 540, d30_plus: 202 }, motionMix: { new: 0.70, expansion: 0.30 } },
+    { stage: "Qualified",    value: 184.6, count:  712, convPct: 52,   aging: { d0_14:  420, d15_30: 220, d30_plus:  72 }, motionMix: { new: 0.65, expansion: 0.35 } },
+    { stage: "Discovery",    value:  96.8, count:  402, convPct: 65,   aging: { d0_14:  210, d15_30: 130, d30_plus:  62 }, motionMix: { new: 0.60, expansion: 0.40 } },
+    { stage: "Proposal",     value:  62.4, count:  221, convPct: 58,   aging: { d0_14:  120, d15_30:  65, d30_plus:  36 }, motionMix: { new: 0.55, expansion: 0.45 } },
+    { stage: "Negotiation",  value:  35.8, count:  108, convPct: 71,   aging: { d0_14:   55, d15_30:  35, d30_plus:  18 }, motionMix: { new: 0.50, expansion: 0.50 } },
+    { stage: "Closed Won",   value:  25.4, count:   78, convPct: null, aging: null,                                          motionMix: { new: 0.45, expansion: 0.55 } }
   ],
 
   /* Forecast vs Quota trend (last 8 weeks, weighted commit).
@@ -79,20 +113,23 @@ window.SALESPULSE_DATA = {
     forecastAccuracy: 0.07
   },
 
-  /* Top deals — biggest open opportunities */
+  /* Top deals — biggest open opportunities.
+     motion = "new" (net-new logo) or "expansion" (upsell / renewal).
+     Distribution: ~58% new / 42% expansion; every region and segment is
+     represented in BOTH motions so the lens filter never empties a slice. */
   topDeals: [
-    { account: "Northwind Industries",   stage: "Negotiation",  amount: 2400000, prob: 75, close: "2026-06-28", owner: "S. Rivera",   forecast: "commit",   region: "NA",   segment: "Enterprise" },
-    { account: "Contoso Manufacturing",  stage: "Proposal",     amount: 1850000, prob: 60, close: "2026-07-15", owner: "L. Patel",    forecast: "bestcase", region: "EMEA", segment: "Enterprise" },
-    { account: "Fabrikam Logistics",     stage: "Discovery",    amount: 1200000, prob: 35, close: "2026-08-10", owner: "M. Chen",     forecast: "upside",   region: "APAC", segment: "Mid-Market" },
-    { account: "Adventure Works",        stage: "Negotiation",  amount: 1100000, prob: 80, close: "2026-06-25", owner: "S. Rivera",   forecast: "commit",   region: "NA",   segment: "Enterprise" },
-    { account: "Tailwind Traders",       stage: "Proposal",     amount:  980000, prob: 55, close: "2026-07-08", owner: "J. Okafor",   forecast: "bestcase", region: "NA",   segment: "Enterprise" },
-    { account: "Wide World Importers",   stage: "Qualified",    amount:  860000, prob: 25, close: "2026-08-22", owner: "L. Patel",    forecast: "upside",   region: "EMEA", segment: "Mid-Market" },
-    { account: "Lucerne Publishing",     stage: "Negotiation",  amount:  720000, prob: 70, close: "2026-06-30", owner: "M. Chen",     forecast: "commit",   region: "EMEA", segment: "Mid-Market" },
-    { account: "Litware Inc.",           stage: "Proposal",     amount:  680000, prob: 50, close: "2026-07-20", owner: "K. Yamada",   forecast: "bestcase", region: "APAC", segment: "Enterprise" },
-    { account: "Proseware Systems",      stage: "Discovery",    amount:  540000, prob: 30, close: "2026-08-30", owner: "J. Okafor",   forecast: "upside",   region: "NA",   segment: "Mid-Market" },
-    { account: "Margie's Travel",        stage: "Negotiation",  amount:  480000, prob: 65, close: "2026-07-05", owner: "S. Rivera",   forecast: "commit",   region: "NA",   segment: "SMB" },
-    { account: "Trey Research",          stage: "Proposal",     amount:  420000, prob: 55, close: "2026-07-18", owner: "L. Patel",    forecast: "bestcase", region: "EMEA", segment: "Mid-Market" },
-    { account: "Graphic Design Inst.",   stage: "Negotiation",  amount:  380000, prob: 85, close: "2026-06-20", owner: "M. Chen",     forecast: "commit",   region: "APAC", segment: "SMB" }
+    { account: "Northwind Industries",   stage: "Negotiation",  amount: 2400000, prob: 75, close: "2026-06-28", owner: "S. Rivera",   forecast: "commit",   region: "NA",   segment: "Enterprise",  motion: "new" },
+    { account: "Contoso Manufacturing",  stage: "Proposal",     amount: 1850000, prob: 60, close: "2026-07-15", owner: "L. Patel",    forecast: "bestcase", region: "EMEA", segment: "Enterprise",  motion: "expansion" },
+    { account: "Fabrikam Logistics",     stage: "Discovery",    amount: 1200000, prob: 35, close: "2026-08-10", owner: "M. Chen",     forecast: "upside",   region: "APAC", segment: "Mid-Market",  motion: "new" },
+    { account: "Adventure Works",        stage: "Negotiation",  amount: 1100000, prob: 80, close: "2026-06-25", owner: "S. Rivera",   forecast: "commit",   region: "NA",   segment: "Enterprise",  motion: "expansion" },
+    { account: "Tailwind Traders",       stage: "Proposal",     amount:  980000, prob: 55, close: "2026-07-08", owner: "J. Okafor",   forecast: "bestcase", region: "NA",   segment: "Enterprise",  motion: "new" },
+    { account: "Wide World Importers",   stage: "Qualified",    amount:  860000, prob: 25, close: "2026-08-22", owner: "L. Patel",    forecast: "upside",   region: "EMEA", segment: "Mid-Market",  motion: "new" },
+    { account: "Lucerne Publishing",     stage: "Negotiation",  amount:  720000, prob: 70, close: "2026-06-30", owner: "M. Chen",     forecast: "commit",   region: "EMEA", segment: "Mid-Market",  motion: "new" },
+    { account: "Litware Inc.",           stage: "Proposal",     amount:  680000, prob: 50, close: "2026-07-20", owner: "K. Yamada",   forecast: "bestcase", region: "APAC", segment: "Enterprise",  motion: "expansion" },
+    { account: "Proseware Systems",      stage: "Discovery",    amount:  540000, prob: 30, close: "2026-08-30", owner: "J. Okafor",   forecast: "upside",   region: "NA",   segment: "Mid-Market",  motion: "new" },
+    { account: "Margie's Travel",        stage: "Negotiation",  amount:  480000, prob: 65, close: "2026-07-05", owner: "S. Rivera",   forecast: "commit",   region: "NA",   segment: "SMB",         motion: "expansion" },
+    { account: "Trey Research",          stage: "Proposal",     amount:  420000, prob: 55, close: "2026-07-18", owner: "L. Patel",    forecast: "bestcase", region: "EMEA", segment: "Mid-Market",  motion: "expansion" },
+    { account: "Graphic Design Inst.",   stage: "Negotiation",  amount:  380000, prob: 85, close: "2026-06-20", owner: "M. Chen",     forecast: "commit",   region: "APAC", segment: "SMB",         motion: "new" }
   ],
 
   /* Rep leaderboard */
@@ -163,6 +200,7 @@ window.SALESPULSE_DATA = {
     [
       "APAC has the highest growth rate (+16.5%) but lowest absolute pipeline — investment opportunity.",
       "Enterprise segment is 52% of pipeline but only 24% of deal count — deal quality is high.",
+      "Expansion is 40% of pipeline but ~50% of weighted pipeline (40% win rate vs 22% for new logo) — under-invested high-ROI motion.",
       "Activity score for E. Sokolova (55) is below threshold — coaching candidate.",
       "Recommended action: re-balance territory coverage in EMEA Mid-Market."
     ],

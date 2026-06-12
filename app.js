@@ -7,6 +7,30 @@
   const GH_OWNER = "HashwanthVen";
   const GH_REPO  = "salespulse-live";
 
+  /* ---------- NEW vs EXPANSION MOTION LENS (#9) ----------
+     Global toggle in the hero strip. When non-"all", re-slices KPI DESK,
+     PIPELINE FUNNEL, FORECAST vs QUOTA, TOP OPEN DEALS, PIPELINE BY
+     SEGMENT, and PIPELINE BY REGION. WHAT CHANGED, SLIPPAGE, REPS,
+     RISKS, INSIGHTS, AUDIENCE, RELEASE NOTES are unaffected. */
+  const LS_MOTION_KEY = "salespulse.motion";
+  const MOTION_VALUES = ["all", "new", "expansion"];
+  const MOTION_LABEL  = { all: "ALL", new: "NEW LOGO", expansion: "EXPANSION" };
+  const MOTION_CHIP_CLS = { new: "", expansion: "exp" };
+  // Panels that should display a "MOTION: ..." chip when the lens is on.
+  const MOTION_AFFECTED_PANELS = ["dashboard","funnel","forecast","deals","segments"];
+  let currentMotion = (function () {
+    try {
+      const saved = localStorage.getItem(LS_MOTION_KEY);
+      if (MOTION_VALUES.indexOf(saved) >= 0) return saved;
+    } catch (e) { /* localStorage may be blocked */ }
+    return "all";
+  })();
+  function motionShare(m) {
+    const ms = D.motionSplit;
+    if (!ms || m === "all" || !ms[m]) return 1;
+    return Math.max(0, Math.min(1, (ms[m].share || 0) / 100));
+  }
+
   /* ---------- TICKER ---------- */
   function renderTicker() {
     const track = $("ticker-track");
@@ -47,11 +71,18 @@
     if (!grid) return;
     const ps     = D.priorSnapshot || null;
     const priorK = ps && ps.kpis || {};
-    grid.innerHTML = D.kpis.map((k) => {
+    const list   = (currentMotion !== "all" && D.kpisByMotion && D.kpisByMotion[currentMotion])
+      ? D.kpisByMotion[currentMotion]
+      : D.kpis;
+    // Whisper line uses prior snapshot only on the ALL view — per-motion
+    // prior snapshots aren't tracked, and showing the global prior under
+    // motion-filtered current values would be misleading.
+    const showWhisper = currentMotion === "all";
+    grid.innerHTML = list.map((k) => {
       const arrow = k.direction === "up" ? "▲" : k.direction === "down" ? "▼" : "▬";
       const pk    = KPI_PRIOR_KEY[k.label];
       const prior = pk ? priorK[pk] : null;
-      const whisper = (prior && ps && ps.asOf)
+      const whisper = (showWhisper && prior && ps && ps.asOf)
         ? `<div class="k-whisper" title="Prior snapshot taken ${esc(ps.asOf)}">vs ${esc(ps.asOf)}: <b>${esc(prior)}</b> → <b>${esc(k.value)}</b></div>`
         : "";
       return `
@@ -183,15 +214,34 @@
   function renderFunnel() {
     const wrap = $("funnel");
     if (!wrap) return;
-    const max = D.funnel[0].value;
+    // motion-scaled values: when the lens is set, apply each stage's
+    // motionMix share so the bars and dollar totals reflect the slice.
+    // counts/aging are also scaled (rounded) because mocked exact counts
+    // per motion aren't tracked — proportional split is the honest read.
+    const m = currentMotion;
+    function scaled(f) {
+      if (m === "all" || !f.motionMix || f.motionMix[m] == null) {
+        return { value: f.value, count: f.count, aging: f.aging };
+      }
+      const k = f.motionMix[m];
+      const aging = f.aging ? {
+        d0_14:    Math.round(f.aging.d0_14    * k),
+        d15_30:   Math.round(f.aging.d15_30   * k),
+        d30_plus: Math.round(f.aging.d30_plus * k)
+      } : null;
+      return { value: +(f.value * k).toFixed(1), count: Math.round(f.count * k), aging };
+    }
+    const stages = D.funnel.map(scaled);
+    const max = stages[0].value;
     wrap.innerHTML = D.funnel.map((f, i) => {
-      const pct = Math.max((f.value / max) * 100, 6);
+      const s = stages[i];
+      const pct = Math.max((s.value / max) * 100, 6);
       const conv = f.convPct;
       let convCls = "";
       if (conv != null) {
         convCls = conv >= 60 ? "good" : conv >= 40 ? "warn" : "bad";
       }
-      const a = f.aging;
+      const a = s.aging;
       const buckets = a ? `
             <div class="funnel-buckets" aria-label="Deals by time in stage">
               <span class="bucket"      title="Deals 0-14 days in stage"><span class="b-lbl">0-14d</span><b>${a.d0_14}</b></span>
@@ -203,10 +253,10 @@
           <div class="funnel-name">${esc(f.stage)}</div>
           <div class="funnel-bar-col">
             <div class="funnel-bar-wrap">
-              <div class="funnel-bar" style="width:${pct.toFixed(1)}%;">${f.count} DEALS</div>
+              <div class="funnel-bar" style="width:${pct.toFixed(1)}%;">${s.count} DEALS</div>
             </div>${buckets}
           </div>
-          <div class="funnel-amount">$${f.value.toFixed(1)}M</div>
+          <div class="funnel-amount">$${s.value.toFixed(1)}M</div>
           <div class="funnel-conv ${convCls}">${conv != null ? "↘ " + conv + "%" : "— win —"}</div>
         </div>`;
     }).join("");
@@ -223,24 +273,33 @@
     const PADL = 40, PADR = 14, PADT = 18, PADB = 26;
     const innerW = W - PADL - PADR;
     const innerH = H - PADT - PADB;
-    const values = D.trend[series];
-    const quota = D.trend.quota;
-    const weeks = D.trend.weeks;
-    const acc = D.trend.forecastAccuracy || 0;
-    const commitVals = D.trend.commit;
-    const showBand = series === "commit" && acc > 0;
+    // Motion lens: scale commit/bestcase/pace contribution by the motion's
+    // share of pipeline. Quota stays whole — the chart is "this motion's
+    // contribution against the unchanged company quota", which is the same
+    // way sales leaders read NEW vs EXPANSION attainment.
+    const share      = motionShare(currentMotion);
+    const motionOn   = currentMotion !== "all";
+    const values     = motionOn ? D.trend[series].map((v) => +(v * share).toFixed(2)) : D.trend[series];
+    const quota      = D.trend.quota;
+    const weeks      = D.trend.weeks;
+    const acc        = D.trend.forecastAccuracy || 0;
+    const commitVals = motionOn ? D.trend.commit.map((v) => +(v * share).toFixed(2)) : D.trend.commit;
+    const showBand   = series === "commit" && acc > 0;
 
     // Pace line: linear $0 → quotaQ across meta.weeksTotal weeks, sampled
     // at the same week indices the chart shows. Prefer the precomputed
     // trend.pace array for transparency; fall back to a live compute if
     // weeksTotal exists. Either way, this is the "where commit should be
-    // today to stay on a flat linear pace to quota" reference.
+    // today to stay on a flat linear pace to quota" reference. On the
+    // motion lens, pace is scaled by share too — the question becomes
+    // "is this motion on pace to deliver its share of quota?".
     const weeksTotal = (D.meta && D.meta.weeksTotal) || values.length;
     const quotaQ     = (D.meta && D.meta.quotaQ)     || quota[quota.length - 1];
     let pace = D.trend.pace;
     if (!Array.isArray(pace) || pace.length !== values.length) {
       pace = values.map((_, i) => +(quotaQ * ((i + 1) / weeksTotal)).toFixed(2));
     }
+    if (motionOn) pace = pace.map((v) => +(v * share).toFixed(2));
 
     const all = values.concat(quota);
     if (showBand) {
@@ -314,9 +373,12 @@
     }
     if (cap) {
       const pacePart = `Pace line: linear $0 → quota across ${weeksTotal} weeks. Above pace = ahead of plan.`;
-      cap.textContent = showBand
+      const motionPart = motionOn
+        ? ` Showing ${MOTION_LABEL[currentMotion]} contribution to the unchanged company quota.`
+        : "";
+      cap.textContent = (showBand
         ? `Confidence band: ±${(acc * 100).toFixed(0)}% based on TTM forecast accuracy · ${pacePart}`
-        : pacePart;
+        : pacePart) + motionPart;
     }
   }
   function bindToggle() {
@@ -351,7 +413,7 @@
     const tbody = $("deals-tbody");
     if (!tbody) return;
     if (rows.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;color:var(--dim);padding:18px;">NO MATCHING DEALS</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;color:var(--dim);padding:18px;">NO MATCHING DEALS</td></tr>`;
       setText("deals-count", "0 OPEN · $0.0M");
       return;
     }
@@ -360,6 +422,9 @@
     tbody.innerHTML = rows.map((d) => {
       const probCls = d.prob >= 70 ? "green" : d.prob >= 40 ? "amber" : "red";
       const fcst = (d.forecast || "upside").toLowerCase();
+      const mot  = d.motion || "new";
+      const motCls = mot === "expansion" ? "exp" : "new";
+      const motLbl = mot === "expansion" ? "EXP" : "NEW";
       return `
         <tr data-account="${esc(d.account)}">
           <td><b class="green">${esc(d.account)}</b></td>
@@ -370,6 +435,7 @@
           <td>${esc(d.owner)}</td>
           <td>${esc(d.region)}</td>
           <td>${esc(d.segment)}</td>
+          <td><span class="mot-badge mot-${motCls}" title="${mot === "expansion" ? "Expansion / upsell / renewal" : "Net-new logo"}">${motLbl}</span></td>
           <td><span class="status-pill ${fcst}">${esc(d.forecast)}</span></td>
         </tr>`;
     }).join("");
@@ -383,6 +449,7 @@
       .filter((d) => (rg === "all" || d.region === rg))
       .filter((d) => (fc === "all" || d.forecast === fc))
       .filter((d) => (!myDealsActive || d.owner === currentRep))
+      .filter((d) => (currentMotion === "all" || d.motion === currentMotion))
       .sort((a, b) => b.amount - a.amount);
     renderDeals(rows);
   }
@@ -531,6 +598,7 @@
       const region = $("deal-region");   if (region) region.value = "all";
       const fcst   = $("deal-forecast"); if (fcst)   fcst.value   = "all";
       if (myDealsActive) { myDealsActive = false; updateMyDealsBtn(); }
+      if (currentMotion !== "all") setMotion("all");
       applyDealFilters();
       row = find();
     }
@@ -570,29 +638,62 @@
   function renderSegments() {
     const grid = $("seg-grid");
     if (!grid) return;
-    grid.innerHTML = D.segments.map((s) => `
-      <div class="seg">
-        <div class="seg-name">${esc(s.name)}</div>
-        <div class="seg-value">$${s.value.toFixed(1)}M</div>
-        <div class="seg-bar"><span style="width:${s.share}%;"></span></div>
-        <div class="seg-meta"><span>${s.share}%</span><span>${s.deals} deals</span></div>
-      </div>
-    `).join("");
+    // Motion-split stacked-bar above the grid (always visible, even on
+    // ALL view — it's the headline number for the lens). When the lens
+    // is filtered, also scales the per-segment $$ and deal counts by
+    // the global motion share so the four tiles tell the same story.
+    const ms = D.motionSplit;
+    const wrap = $("motion-split");
+    if (wrap) {
+      if (ms && ms.new && ms.expansion) {
+        const newShare = Math.max(0, Math.min(100, ms.new.share || 0));
+        const expShare = Math.max(0, 100 - newShare);
+        wrap.innerHTML = `
+          <div class="ms-head">
+            <span class="ms-title">NEW vs EXPANSION SPLIT</span>
+            <span class="ms-sub">$M PIPELINE · TTM WIN RATE</span>
+          </div>
+          <div class="ms-bar" role="img" aria-label="New logo ${newShare}%, Expansion ${expShare}%">
+            <span class="ms-new" style="width:${newShare}%;" title="NEW LOGO · ${newShare}%">NEW · ${newShare}%</span>
+            <span class="ms-exp" style="width:${expShare}%;" title="EXPANSION · ${expShare}%">EXP · ${expShare}%</span>
+          </div>
+          <div class="ms-legend">
+            <span><i class="ms-dot ms-d-new"></i>NEW LOGO · <b>$${ms.new.value.toFixed(1)}M</b> · win <b>${ms.new.winRate}%</b></span>
+            <span><i class="ms-dot ms-d-exp"></i>EXPANSION · <b>$${ms.expansion.value.toFixed(1)}M</b> · win <b>${ms.expansion.winRate}%</b></span>
+          </div>`;
+      } else {
+        wrap.innerHTML = "";
+      }
+    }
+    const share = motionShare(currentMotion);
+    grid.innerHTML = D.segments.map((s) => {
+      const v = +(s.value * share).toFixed(1);
+      const d = Math.round(s.deals * share);
+      return `
+        <div class="seg">
+          <div class="seg-name">${esc(s.name)}</div>
+          <div class="seg-value">$${v.toFixed(1)}M</div>
+          <div class="seg-bar"><span style="width:${s.share}%;"></span></div>
+          <div class="seg-meta"><span>${s.share}%</span><span>${d} deals</span></div>
+        </div>`;
+    }).join("");
   }
 
   /* ---------- REGIONS ---------- */
   function renderRegions() {
     const tbody = $("region-tbody");
     if (!tbody) return;
+    const share = motionShare(currentMotion);
     tbody.innerHTML = D.regions.map((r) => {
-      const cls = r.status.toLowerCase().replace(/\s+/g, "-");
+      const v = +(r.value * share).toFixed(1);
+      const d = Math.round(r.deals * share);
       const growthGreen = r.growth.startsWith("+");
       const statusCls = r.status === "On Track" ? "commit" : r.status === "Watch" ? "open" : "risk";
       return `
         <tr>
           <td><b class="green">${esc(r.name)}</b></td>
-          <td class="num">$${r.value.toFixed(1)}M</td>
-          <td class="num">${r.deals}</td>
+          <td class="num">$${v.toFixed(1)}M</td>
+          <td class="num">${d}</td>
           <td class="num ${growthGreen ? "green" : "red"}">${esc(r.growth)}</td>
           <td><span class="status-pill ${statusCls}">${esc(r.status)}</span></td>
         </tr>`;
@@ -685,6 +786,66 @@
   }
 
   /* ---------- COMMAND BAR ---------- */
+  /* ---------- MOTION LENS WIRING (#9) ----------
+     setMotion(): central re-render path — updates state, persists,
+     re-renders every panel that's motion-aware, updates the toggle UI
+     and the per-panel chips, and applyDealFilters so the table reflects
+     the new motion immediately. */
+  function setMotion(m) {
+    if (MOTION_VALUES.indexOf(m) < 0) return;
+    if (m === currentMotion) { updateMotionPillUI(); updateMotionChips(); return; }
+    currentMotion = m;
+    try { localStorage.setItem(LS_MOTION_KEY, m); } catch (e) {}
+    updateMotionPillUI();
+    renderKpis();
+    renderFunnel();
+    renderChart(currentSeries);
+    applyDealFilters();
+    renderSegments();
+    renderRegions();
+    updateMotionChips();
+  }
+  function updateMotionPillUI() {
+    document.querySelectorAll(".motion-seg").forEach((b) => {
+      const a = b.dataset.motion === currentMotion;
+      b.classList.toggle("active", a);
+      b.setAttribute("aria-selected", a ? "true" : "false");
+    });
+  }
+  // Inject a "MOTION: NEW LOGO" chip into the .panel-head .sub of every
+  // panel the lens affects. Chips are removed when the lens is back to
+  // ALL so panels go back to their normal subhead.
+  function updateMotionChips() {
+    const showChip = currentMotion !== "all";
+    const lbl = MOTION_LABEL[currentMotion] || "";
+    const cls = MOTION_CHIP_CLS[currentMotion] || "";
+    MOTION_AFFECTED_PANELS.forEach((id) => {
+      const panel = document.getElementById(id);
+      if (!panel) return;
+      const sub = panel.querySelector(".panel-head .sub");
+      if (!sub) return;
+      let chip = sub.querySelector(".motion-chip");
+      if (showChip) {
+        if (!chip) {
+          chip = document.createElement("span");
+          chip.className = "motion-chip";
+          sub.appendChild(chip);
+        }
+        chip.className = "motion-chip" + (cls ? " " + cls : "");
+        chip.textContent = "MOTION: " + lbl;
+        chip.setAttribute("title", "NEW vs EXPANSION lens — click ALL in the hero strip to clear.");
+      } else if (chip) {
+        chip.remove();
+      }
+    });
+  }
+  function bindMotion() {
+    document.querySelectorAll(".motion-seg").forEach((b) => {
+      b.addEventListener("click", () => setMotion(b.dataset.motion));
+    });
+    updateMotionPillUI();
+  }
+
   function bindCommand() {
     const inp = $("cmd"); if (!inp) return;
     inp.addEventListener("keydown", (e) => {
@@ -697,7 +858,7 @@
   }
   function runCommand(cmd) {
     if (cmd === "HELP") {
-      flash("CMDS: GO DASH | GO CHG | GO FUNNEL | GO FORECAST | GO DEALS | GO REPS | GO SLIP | GO RISKS | GO AUD | FILTER NA/EMEA/APAC | FCST COMMIT/BEST | ROTATE");
+      flash("CMDS: GO DASH | GO CHG | GO FUNNEL | GO FORECAST | GO DEALS | GO REPS | GO SLIP | GO RISKS | GO AUD | FILTER NA/EMEA/APAC | FCST COMMIT/BEST | MOTION ALL/NEW/EXP | ROTATE");
       return;
     }
     const goMap = {
@@ -712,6 +873,9 @@
     if (goMap[cmd]) { const el = document.getElementById(goMap[cmd]); if (el) el.scrollIntoView({ behavior: "smooth", block: "start" }); return; }
     if (cmd === "FCST COMMIT" || cmd === "FORECAST COMMIT") { setSeries("commit"); return; }
     if (cmd === "FCST BEST" || cmd === "FORECAST BEST")     { setSeries("bestcase"); return; }
+    if (cmd === "MOTION ALL")                                { setMotion("all"); flash("MOTION LENS: ALL"); return; }
+    if (cmd === "MOTION NEW" || cmd === "MOTION NEWLOGO" || cmd === "MOTION NEW LOGO") { setMotion("new"); flash("MOTION LENS: NEW LOGO"); return; }
+    if (cmd === "MOTION EXP" || cmd === "MOTION EXPANSION") { setMotion("expansion"); flash("MOTION LENS: EXPANSION"); return; }
     if (cmd.startsWith("FILTER ")) {
       const r = cmd.slice(7).trim();
       if (["NA","EMEA","APAC"].includes(r)) {
@@ -768,6 +932,8 @@
     renderInsight();
     bindRegen();
     bindCommand();
+    bindMotion();
+    updateMotionChips();
     loadAudience();
     const r = $("aud-refresh"); if (r) r.addEventListener("click", loadAudience);
     setInterval(loadAudience, 30000);

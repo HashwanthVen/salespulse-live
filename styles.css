@@ -204,6 +204,80 @@ main { padding: 10px 12px 50px; max-width: 1600px; margin: 0 auto; }
 .chip.info { color: var(--cyan);  border-color: rgba(69,208,255,0.4); }
 .chip.bad  { color: var(--red);   border-color: rgba(255,82,82,0.4); }
 
+/* NEW vs EXPANSION motion lens (#9) — 3-segment toggle pill in the hero
+   strip. Mirrors the .toggle pattern visually so it reads as part of the
+   same control family. Aligned to the right edge of the hero on desktop. */
+.hero .motion-pill { margin-left: auto; }
+.motion-pill {
+  display: inline-flex; align-items: stretch;
+  border: 1px solid var(--border-2); background: var(--bg-1);
+}
+.motion-seg {
+  background: transparent; color: var(--dim);
+  border: none; border-right: 1px solid var(--border-2);
+  font-family: var(--mono); font-size: 11px; font-weight: 700; letter-spacing: 1px;
+  padding: 5px 10px; cursor: pointer;
+}
+.motion-seg:last-child { border-right: none; }
+.motion-seg:hover { color: var(--white); background: var(--bg-2); }
+.motion-seg.active { background: var(--green); color: #000; }
+.motion-seg:focus-visible { outline: 2px solid var(--green); outline-offset: -2px; }
+
+/* Per-panel chip injected into .panel-head .sub when the lens is on.
+   Green for NEW LOGO; cyan for EXPANSION — matches the .mot-badge color
+   contract used inside the TOP OPEN DEALS table. */
+.motion-chip {
+  display: inline-block; margin-left: 10px;
+  padding: 2px 7px; font-size: 10px; font-weight: 700; letter-spacing: 1px;
+  color: var(--green); border: 1px solid rgba(0,230,118,0.5); background: rgba(0,230,118,0.08);
+}
+.motion-chip.exp {
+  color: var(--cyan); border-color: rgba(69,208,255,0.5); background: rgba(69,208,255,0.08);
+}
+
+/* MOT column badge inside TOP OPEN DEALS. NEW is green (the default
+   motion), EXP is cyan so the eye can spot the expansion rows quickly. */
+.mot-badge {
+  display: inline-block; padding: 1px 6px;
+  font-size: 10px; font-weight: 700; letter-spacing: 1px;
+  border: 1px solid var(--border-2); background: var(--bg-1);
+}
+.mot-badge.mot-new { color: var(--green); border-color: rgba(0,230,118,0.5); }
+.mot-badge.mot-exp { color: var(--cyan);  border-color: rgba(69,208,255,0.5); }
+
+/* NEW vs EXPANSION mini stacked-bar at the top of PIPELINE BY SEGMENT.
+   Always rendered (even on ALL) — it's the headline read for the motion
+   split and gives the user a reason to discover the toggle in the hero. */
+.motion-split { margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px dashed var(--border); }
+.motion-split .ms-head {
+  display: flex; justify-content: space-between; align-items: baseline;
+  margin-bottom: 6px; font-size: 11px; letter-spacing: 1px;
+}
+.motion-split .ms-title { color: var(--green); font-weight: 700; }
+.motion-split .ms-sub   { color: var(--dim); }
+.motion-split .ms-bar {
+  display: flex; width: 100%; height: 22px;
+  border: 1px solid var(--border-2); background: var(--bg-1);
+}
+.motion-split .ms-bar span {
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 700; letter-spacing: 1px; color: #000;
+  white-space: nowrap; overflow: hidden;
+}
+.motion-split .ms-new { background: var(--green); }
+.motion-split .ms-exp { background: var(--cyan); }
+.motion-split .ms-legend {
+  display: flex; gap: 16px; margin-top: 6px; font-size: 11px; color: var(--dim);
+  flex-wrap: wrap;
+}
+.motion-split .ms-legend b { color: var(--white); }
+.motion-split .ms-dot {
+  display: inline-block; width: 9px; height: 9px; margin-right: 5px;
+  vertical-align: middle; border: 1px solid var(--border-2);
+}
+.motion-split .ms-d-new { background: var(--green); }
+.motion-split .ms-d-exp { background: var(--cyan); }
+
 /* KPI TILES */
 .kpi-grid {
   display: grid;
@@ -648,4 +722,14 @@ select option { background: var(--bg); color: var(--white); }
   /* WHAT CHANGED panel: stack 4 cards into 1 column on mobile. */
   .changed-grid { grid-template-columns: 1fr; }
   .change-card .card-big { font-size: 14px; }
+  /* NEW vs EXPANSION pill (#9): on mobile the hero stacks (already set
+     to flex-direction:column above), so let the pill take a full row
+     and stretch its segments edge-to-edge for easy thumb-tapping. */
+  .hero .motion-pill { margin-left: 0; width: 100%; }
+  .motion-seg { flex: 1 1 0; text-align: center; padding: 7px 6px; }
+  /* Motion-split bar on segments: stack legend nicely, ensure bar stays
+     readable when labels would overflow tiny widths. */
+  .motion-split .ms-bar { height: 20px; }
+  .motion-split .ms-bar span { font-size: 9px; }
+  .motion-split .ms-legend { gap: 8px; font-size: 10px; }
 }
