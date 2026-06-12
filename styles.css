@@ -1658,3 +1658,70 @@ main.lens-board section#inbox,
   .winloss-stage-list .winloss-row { grid-template-columns: 12px 1fr 40px 52px 56px; }
   .winloss-seg { font-size: 9px; }
 }
+
+
+
+/* ---------- STAKEHOLDER REACH (#27) ----------
+   Multi-threading / buying-group coverage on every top-deal row + a
+   portfolio rollup placed inside the DEAL RISK panel. */
+.reach-cell {
+  white-space: nowrap;
+  font-feature-settings: "tnum";
+  padding: 6px 8px !important;
+  line-height: 1.35;
+  vertical-align: middle;
+}
+.reach-cell .reach-status {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 2px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  margin-right: 4px;
+  border: 1px solid transparent;
+}
+.reach-cell .reach-status.strong { color: var(--green); border-color: rgba(46,160,67,0.35); background: rgba(46,160,67,0.08); }
+.reach-cell .reach-status.ok { color: var(--green-soft, #5fb878); border-color: rgba(95,184,120,0.30); background: rgba(95,184,120,0.06); }
+.reach-cell .reach-status.thin { color: var(--amber); border-color: rgba(210,153,34,0.40); background: rgba(210,153,34,0.10); }
+.reach-cell .reach-status.single { color: var(--red); border-color: rgba(218,54,51,0.45); background: rgba(218,54,51,0.12); }
+.reach-cell .reach-single-chip { display: inline-block; margin-left: 2px; padding: 0 4px; font-size: 10px; color: var(--red); border: 1px solid rgba(218,54,51,0.35); border-radius: 2px; background: rgba(218,54,51,0.06); letter-spacing: 0.3px; }
+.reach-cell .reach-mismatch { display: inline-block; margin-left: 4px; padding: 0 4px; font-size: 10px; color: var(--amber); border: 1px solid rgba(210,153,34,0.35); border-radius: 2px; background: rgba(210,153,34,0.06); letter-spacing: 0.3px; }
+.reach-cell .reach-bar { display: inline-flex; gap: 1px; margin-left: 6px; vertical-align: middle; font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; font-size: 11px; letter-spacing: -1px; }
+.reach-cell .reach-bar-cell { line-height: 1; }
+.reach-cell .reach-bar-cell.s0 { color: var(--dim); opacity: 0.45; }
+.reach-cell .reach-bar-cell.s1 { color: var(--amber); opacity: 0.85; }
+.reach-cell .reach-bar-cell.s2 { color: var(--green); }
+.reach-cell .reach-mobile { display: none; }
+
+/* Aggregate rollup inside DEAL RISK panel */
+.reach-aggregate { padding: 8px 10px 10px; margin: 0 -8px 10px; border-bottom: 1px dashed var(--border, rgba(255,255,255,0.08)); }
+.reach-agg-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 6px; font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; }
+.reach-agg-title { font-size: 11px; letter-spacing: 1px; color: var(--dim); font-weight: 600; }
+.reach-agg-avg { font-size: 11px; font-weight: 700; letter-spacing: 0.4px; }
+.reach-agg-avg.strong { color: var(--green); }
+.reach-agg-avg.ok { color: var(--green-soft, #5fb878); }
+.reach-agg-avg.thin { color: var(--amber); }
+.reach-agg-avg.single { color: var(--red); }
+.reach-agg-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.reach-agg-chip { display: inline-block; padding: 2px 7px; font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; font-size: 10.5px; letter-spacing: 0.3px; border: 1px solid var(--border, rgba(255,255,255,0.10)); border-radius: 2px; color: var(--text, #c9d1d9); background: rgba(255,255,255,0.02); cursor: default; }
+.reach-agg-chip.clickable { cursor: pointer; color: var(--red); border-color: rgba(218,54,51,0.45); background: rgba(218,54,51,0.10); }
+.reach-agg-chip.clickable:hover { background: rgba(218,54,51,0.18); }
+.reach-agg-chip.clickable.active { background: rgba(218,54,51,0.28); }
+.reach-agg-chip.amber { color: var(--amber); border-color: rgba(210,153,34,0.35); }
+.reach-agg-chip.strong { color: var(--green); border-color: rgba(46,160,67,0.35); }
+.reach-agg-chip.clear { color: var(--dim); cursor: pointer; }
+.reach-agg-chip.clear:hover { color: var(--text); }
+
+/* Mobile collapse */
+@media (max-width: 480px) {
+  .reach-cell .reach-status,
+  .reach-cell .reach-single-chip,
+  .reach-cell .reach-mismatch,
+  .reach-cell .reach-bar { display: none; }
+  .reach-cell .reach-mobile { display: inline-block; font-size: 10.5px; font-weight: 600; letter-spacing: 0.4px; }
+  .reach-cell .reach-mobile.strong { color: var(--green); }
+  .reach-cell .reach-mobile.ok { color: var(--green-soft, #5fb878); }
+  .reach-cell .reach-mobile.thin { color: var(--amber); }
+  .reach-cell .reach-mobile.single { color: var(--red); }
+}

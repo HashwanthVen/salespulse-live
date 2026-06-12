@@ -1000,9 +1000,15 @@
   let sortByNextStep = false;
   let sortByMomentum = false;
   let sortByQual    = false;
+  let sortByReach   = false;
   const LS_QUAL_KEY = "salespulse.qualWeakOnly";
   let dealsWeakOnly = (function () {
     try { return localStorage.getItem(LS_QUAL_KEY) === "1"; }
+    catch (e) { return false; }
+  })();
+  const LS_REACH_KEY = "salespulse.reachSingleOnly";
+  let dealsSingleOnly = (function () {
+    try { return localStorage.getItem(LS_REACH_KEY) === "1"; }
     catch (e) { return false; }
   })();
   function dealHealth(d) {
@@ -1090,11 +1096,151 @@
          + `<span class="qual-bar" aria-label="MEDDPICC checks">${cells}</span></td>`;
   }
 
+  /* ---------- STAKEHOLDER REACH (#27) ----------
+     Multi-threading / buying-group coverage on every top deal.
+     5 standard roles (champion / economic-buyer / decision-maker /
+     influencer / tech-evaluator) each scored 0 (none) / 1 (touched) /
+     2 (engaged). reachScore = sum/10. Status bands per spec; thresholds
+     relax under EXPANSION motion since renewals naturally narrow.
+     "Single-threaded" is computed independently as engaged-count ≤ 1
+     so a deal can be OK on raw score yet still flagged as a single
+     point of failure on people. */
+  const REACH_ROLES = [
+    { key: "champion",      letter: "C",  label: "Champion" },
+    { key: "economicBuyer", letter: "EB", label: "Economic Buyer" },
+    { key: "decisionMaker", letter: "DM", label: "Decision Maker" },
+    { key: "influencer",    letter: "I",  label: "Influencer" },
+    { key: "techEvaluator", letter: "T",  label: "Tech Evaluator" }
+  ];
+  const REACH_STATE = { 0: "none", 1: "touched", 2: "engaged" };
+  const REACH_GLYPH = { 0: "░░",   1: "▒▒",     2: "▓▓" };
+  function reachScore(d) {
+    if (!d || !d.reach) return 0;
+    let sum = 0;
+    REACH_ROLES.forEach((r) => { sum += (+d.reach[r.key] || 0); });
+    return sum / 10;
+  }
+  function reachEngagedCount(d) {
+    if (!d || !d.reach) return 0;
+    return REACH_ROLES.reduce((n, r) => n + ((+d.reach[r.key] || 0) >= 2 ? 1 : 0), 0);
+  }
+  function isSingleThreaded(d) { return reachEngagedCount(d) <= 1; }
+  function reachStatus(score, motion) {
+    // Motion-aware: EXPANSION renewals are naturally narrower so floors relax.
+    const exp = motion === "expansion";
+    const T_STRONG = exp ? 0.5  : 0.7;
+    const T_OK     = exp ? 0.3  : 0.4;
+    const T_THIN   = exp ? 0.15 : 0.2;
+    if (score >= T_STRONG) return "STRONG";
+    if (score >= T_OK)     return "OK";
+    if (score >= T_THIN)   return "THIN";
+    return "SINGLE-THREADED";
+  }
+  function reachStatusCls(status) {
+    if (status === "STRONG")          return "strong";
+    if (status === "OK")              return "ok";
+    if (status === "THIN")            return "thin";
+    return "single";
+  }
+  function reachCell(d) {
+    if (!d.reach) return `<td class="reach-cell"><span class="muted">—</span></td>`;
+    const score   = reachScore(d);
+    const engaged = reachEngagedCount(d);
+    const status  = reachStatus(score, d.motion);
+    const cls     = reachStatusCls(status);
+    const cells = REACH_ROLES.map((r) => {
+      const v = +d.reach[r.key] || 0;
+      return `<span class="reach-bar-cell s${v}" title="${r.label}: ${REACH_STATE[v]}">${REACH_GLYPH[v]}</span>`;
+    }).join("");
+    const singleChip = (engaged <= 1)
+      ? ` <span class="reach-single-chip" title="Single point of failure — only ${engaged} stakeholder${engaged === 1 ? "" : "s"} engaged">1-thread</span>`
+      : "";
+    // MEDDIC reconciliation guard — strong MEDDIC but weak reach is a red flag.
+    const q = qualScore(d);
+    const mismatchChip = (q >= 7 && score < 0.4)
+      ? ` <span class="reach-mismatch" title="MEDDIC ${q}/8 but REACH ${(score*100).toFixed(0)}% — re-score C / EB">⚠ MISMATCH</span>`
+      : "";
+    const tip = `STAKEHOLDER REACH ${(score*100).toFixed(0)}% — ${status}\n` + REACH_ROLES.map((r) => `  ${r.label}: ${REACH_STATE[+d.reach[r.key] || 0]}`).join("\n");
+    return `<td class="reach-cell" title="${esc(tip)}">`
+         + `<span class="reach-status ${cls}">${status}</span>${singleChip}${mismatchChip}`
+         + `<span class="reach-bar" aria-label="Buying-group coverage">${cells}</span>`
+         + `<span class="reach-mobile ${cls}" aria-hidden="true">● ${status}</span>`
+         + `</td>`;
+  }
+  function renderReachAggregate() {
+    const el = $("reach-aggregate");
+    if (!el) return;
+    const deals = D.topDeals || [];
+    if (!deals.length) { el.innerHTML = ""; return; }
+    const scored = deals.filter((d) => !!d.reach);
+    if (!scored.length) { el.innerHTML = ""; return; }
+    const avg     = scored.reduce((s, d) => s + reachScore(d), 0) / scored.length;
+    const singles = scored.filter(isSingleThreaded);
+    const missEB  = scored.filter((d) => (+d.reach.economicBuyer || 0) === 0);
+    const missDM  = scored.filter((d) => (+d.reach.decisionMaker || 0) === 0);
+    const strongs = scored.filter((d) => reachStatus(reachScore(d), d.motion) === "STRONG");
+    const avgStatus = reachStatus(avg, "all");
+    const avgCls    = reachStatusCls(avgStatus);
+    const singleAmt = singles.reduce((s, d) => s + (d.amount || 0), 0);
+    const singleChip = singles.length
+      ? `<button class="reach-agg-chip clickable ${dealsSingleOnly ? "active" : ""}" id="reach-single-chip" title="Filter TOP OPEN DEALS to single-threaded only">${singles.length} SINGLE-THREADED · $${formatK(singleAmt)} ⚠</button>`
+      : `<span class="reach-agg-chip strong">0 SINGLE-THREADED ✓</span>`;
+    const clearChip = dealsSingleOnly
+      ? ` <button class="reach-agg-chip clear" id="reach-clear-chip" title="Clear single-threaded filter">✕ CLEAR</button>`
+      : "";
+    el.innerHTML = `
+      <div class="reach-agg-head">
+        <span class="reach-agg-title">STAKEHOLDER REACH</span>
+        <span class="reach-agg-avg ${avgCls}" title="Portfolio average across top ${scored.length} open deals">PORTFOLIO ${(avg*100).toFixed(0)}% · ${avgStatus}</span>
+      </div>
+      <div class="reach-agg-row">
+        ${singleChip}${clearChip}
+        <span class="reach-agg-chip ${missEB.length > 3 ? "amber" : ""}" title="Deals with no economic-buyer contact">${missEB.length} NO EB</span>
+        <span class="reach-agg-chip ${missDM.length > 3 ? "amber" : ""}" title="Deals with no decision-maker contact">${missDM.length} NO DM</span>
+        <span class="reach-agg-chip strong" title="Deals at STRONG reach (≥0.7)">${strongs.length} STRONG ★</span>
+      </div>
+    `;
+    const sc = $("reach-single-chip");
+    if (sc) sc.addEventListener("click", () => {
+      dealsSingleOnly = !dealsSingleOnly;
+      try { localStorage.setItem(LS_REACH_KEY, dealsSingleOnly ? "1" : "0"); } catch (e) {}
+      renderReachAggregate();
+      applyDealFilters();
+    });
+    const cc = $("reach-clear-chip");
+    if (cc) cc.addEventListener("click", () => {
+      dealsSingleOnly = false;
+      try { localStorage.setItem(LS_REACH_KEY, "0"); } catch (e) {}
+      renderReachAggregate();
+      applyDealFilters();
+    });
+  }
+  function bindReachCellClicks() {
+    const tbody = $("deals-tbody");
+    if (!tbody) return;
+    tbody.querySelectorAll(".reach-cell").forEach((td) => {
+      td.addEventListener("click", () => {
+        const tr = td.closest("tr");
+        const acc = tr && tr.getAttribute("data-account");
+        if (acc) highlightDealRow(acc);
+      });
+    });
+  }
+  function reachInsightBullet() {
+    const deals = (D.topDeals || []).filter((d) => !!d.reach);
+    if (!deals.length) return null;
+    const singles = deals.filter(isSingleThreaded).sort((a, b) => b.amount - a.amount);
+    if (!singles.length) return null;
+    const top = singles[0];
+    const amt = (top.amount / 1e6).toFixed(1);
+    return `REACH risk: ${top.account} ($${amt}M) is single-threaded — only ${reachEngagedCount(top)} stakeholder${reachEngagedCount(top) === 1 ? "" : "s"} engaged. Single-threaded deals win ~18% vs ~47% for ≥5 stakeholders (Gartner 2024). Action: schedule an exec-sponsor intro this week.`;
+  }
+
   function renderDeals(rows) {
     const tbody = $("deals-tbody");
     if (!tbody) return;
     if (rows.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="13" style="text-align:center;color:var(--dim);padding:18px;">NO MATCHING DEALS</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="14" style="text-align:center;color:var(--dim);padding:18px;">NO MATCHING DEALS</td></tr>`;
       setText("deals-count", "0 OPEN · $0.0M");
       renderDealsHealth([]);
       renderQualHealth([]);
@@ -1107,6 +1253,8 @@
     const top3 = topAccountSet();
     if (sortByQual) {
       rows = rows.slice().sort((a, b) => qualScore(b) - qualScore(a) || b.amount - a.amount);
+    } else if (sortByReach) {
+      rows = rows.slice().sort((a, b) => reachScore(b) - reachScore(a) || b.amount - a.amount);
     } else if (sortByMomentum) {
       // Highest momentum first (descending). Stable secondary sort by amount.
       rows = rows.slice().sort((a, b) => ((b.engagement && b.engagement.score) || 0) - ((a.engagement && a.engagement.score) || 0) || b.amount - a.amount);
@@ -1130,6 +1278,7 @@
           <td class="num ${probCls}">${d.prob}%</td>
           ${momentumCell(d)}
           ${qualCell(d)}
+          ${reachCell(d)}
           <td>${esc(d.close)}</td>
           ${nextStepCell(d)}
           <td>${esc(d.owner)}</td>
@@ -1218,8 +1367,10 @@
       .filter((d) => (currentMotion === "all" || d.motion === currentMotion))
       .filter((d) => (!dealsRiskOnly || dealHealth(d) === "overdue" || dealHealth(d) === "missing"))
       .filter((d) => (!dealsWeakOnly || isWeakCommit(d)))
+      .filter((d) => (!dealsSingleOnly || isSingleThreaded(d)))
       .sort((a, b) => b.amount - a.amount);
     renderDeals(rows);
+    bindReachCellClicks();
   }
   function bindDealFilters() {
     ["deal-search","deal-region","deal-forecast"].forEach((id) => {
@@ -1230,10 +1381,11 @@
     if (thNs) {
       thNs.addEventListener("click", () => {
         sortByNextStep = !sortByNextStep;
-        if (sortByNextStep) { sortByMomentum = false; sortByQual = false; }
+        if (sortByNextStep) { sortByMomentum = false; sortByQual = false; sortByReach = false; }
         thNs.classList.toggle("sorted", sortByNextStep);
         const thMo = $("th-momentum"); if (thMo) thMo.classList.remove("sorted");
         const thQ  = $("th-qual");     if (thQ)  thQ.classList.remove("sorted");
+        const thR  = $("th-reach");    if (thR)  thR.classList.remove("sorted");
         applyDealFilters();
       });
     }
@@ -1241,10 +1393,11 @@
     if (thMo) {
       thMo.addEventListener("click", () => {
         sortByMomentum = !sortByMomentum;
-        if (sortByMomentum) { sortByNextStep = false; sortByQual = false; }
+        if (sortByMomentum) { sortByNextStep = false; sortByQual = false; sortByReach = false; }
         thMo.classList.toggle("sorted", sortByMomentum);
         const thNs2 = $("th-nextstep"); if (thNs2) thNs2.classList.remove("sorted");
         const thQ2  = $("th-qual");     if (thQ2)  thQ2.classList.remove("sorted");
+        const thR2  = $("th-reach");    if (thR2)  thR2.classList.remove("sorted");
         applyDealFilters();
       });
     }
@@ -1252,10 +1405,23 @@
     if (thQu) {
       thQu.addEventListener("click", () => {
         sortByQual = !sortByQual;
-        if (sortByQual) { sortByMomentum = false; sortByNextStep = false; }
+        if (sortByQual) { sortByMomentum = false; sortByNextStep = false; sortByReach = false; }
         thQu.classList.toggle("sorted", sortByQual);
         const thMo2 = $("th-momentum"); if (thMo2) thMo2.classList.remove("sorted");
         const thNs3 = $("th-nextstep"); if (thNs3) thNs3.classList.remove("sorted");
+        const thRe2 = $("th-reach");    if (thRe2) thRe2.classList.remove("sorted");
+        applyDealFilters();
+      });
+    }
+    const thRe = $("th-reach");
+    if (thRe) {
+      thRe.addEventListener("click", () => {
+        sortByReach = !sortByReach;
+        if (sortByReach) { sortByMomentum = false; sortByNextStep = false; sortByQual = false; }
+        thRe.classList.toggle("sorted", sortByReach);
+        const thMo3 = $("th-momentum"); if (thMo3) thMo3.classList.remove("sorted");
+        const thNs4 = $("th-nextstep"); if (thNs4) thNs4.classList.remove("sorted");
+        const thQ3  = $("th-qual");     if (thQ3)  thQ3.classList.remove("sorted");
         applyDealFilters();
       });
     }
@@ -1974,6 +2140,10 @@
     try {
       const ib = inboxAiBullet();
       if (ib) items.unshift(ib);
+    } catch (e) {}
+    try {
+      const rb = reachInsightBullet();
+      if (rb) items.unshift(rb);
     } catch (e) {}
     list.innerHTML = items.map((s) => `<li>${esc(s)}</li>`).join("");
   }
@@ -2910,6 +3080,7 @@
     renderSegments();
     renderRegions();
     renderRisks();
+    renderReachAggregate();
     renderSlippage();
     renderPipegen();
     renderForwardCoverage();
