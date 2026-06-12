@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>SALESPULSE LIVE · TERMINAL</title>
   <meta name="description" content="SalesPulse Live — Bloomberg-style sales pipeline command center for VPs of Sales, RevOps, and AEs. Synthetic data only." />
-  <link rel="stylesheet" href="styles.css?v=0.11.0" />
+  <link rel="stylesheet" href="styles.css?v=0.12.0" />
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to main content</a>
@@ -54,7 +54,7 @@
     <section class="hero" aria-labelledby="hero-title">
       <span class="label">Q2 FY26 · WEEK 8 OF 13</span>
       <div class="summary" id="hero-title">
-        Commit at <span class="green">$55.9M</span> vs <span class="amber">$60M quota</span> · best case <span class="green">$69.8M</span> · need <span class="amber">$4.1M</span> to close gap.
+        <span id="hero-summary">Commit at <span class="green">$55.9M</span> vs <span class="amber">$60M quota</span> · best case <span class="green">$69.8M</span> · need <span class="amber">$4.1M</span> to close gap.</span>
       </div>
       <div class="chips">
         <span class="chip good">▲ COVERAGE 3.1x</span>
@@ -130,6 +130,7 @@
             <span><span class="swatch" style="background:var(--amber);height:2px;margin-bottom:3px;"></span>Quota line</span>
             <span><span class="swatch swatch-pace"></span>Pace line</span>
             <span><span class="swatch swatch-band"></span>Confidence band</span>
+            <span><span class="swatch swatch-proj"></span>Projected W9-W13</span>
           </div>
           <div class="chart-caption" id="chart-caption"></div>
         </div>
@@ -353,6 +354,7 @@
       </div>
       <div class="panel-body">
         <ul class="rel-list">
+          <li><span class="ver">v0.12</span> <b>FORECAST vs QUOTA: W9-W13 dashed projection + PROJECTED Q-END mini-stat</b> — answers the Friday CRO question ("what will we land at?") in one glance. Chart now spans the full quarter; W1-W8 actuals stay solid, W9-W13 renders as a dashed continuation with a translucent extended confidence band and a "NOW" marker at the W8 boundary. New PROJECTED Q-END stat block beside the existing stats: big tone-colored projection $$, range (±7% TTM accuracy), gap vs quota, and "BEST CASE →" sub-stat — methodology tooltip explains the transparent formula (commit + (bestcase−commit) × 40% − slippage drag at 30% recurrence). Hero strip rewrites every render to incorporate the projection. New PROJ ticker symbol + AI insight bullet ties the projection to a recommended Wednesday action · closes #17</li>
           <li><span class="ver">v0.11</span> <b>TOP OPEN DEALS: per-deal MOMENTUM column + heatmap ribbon</b> — surfaces ghosting deals before they slip. New MOMENTUM column between PROB and CLOSE shows a dot (green / amber / red by score), a 0–100 score, and a ▲/─/▼ trend arrow vs prior week. Hover any cell for the underlying touchpoints, last-touch days, and single/multi-thread tooltip (§9.7 trust). Sortable column. A 12-cell heatmap ribbon above the table is sorted by amount: scan momentum vs deal-size at a glance, click any cell to scroll + pulse that row in the table (§9.5 action). Story this quarter: 4 of the top-12 are trending DOWN (Northwind / Fabrikam / Lucerne / Litware — combined $3.1M weighted) and the new AI insight bullet ties the count to the recommended manager-led pipe review · closes #14</li>
           <li><span class="ver">v0.10</span> <b>TOP OPEN DEALS: NEXT STEP column + health rollup</b> — the #1 Monday pipe-review question ("which deals don't have a defined next step?") answered inline. New column between CLOSE and OWNER renders the next step action + a chip for due-in-N-days (green ✓), N-days OVERDUE (red ◀), or bold <b>MISSING</b> for deals with no logged next step. Panel-head <b>NEXT-STEP HEALTH</b> stat shows ✓ on track · ● due soon · ✗ overdue/missing — click the ✗ count to filter the table down to just the un-defensible commit deals in one click (persisted via localStorage). Sortable column header (missing → overdue → due-soon → on-track). TOP-3 CONCENTRATION tile tooltip now also flags top-3 deals missing a next step. New AI insight bullet ties the count + $$ to a recommended action · closes #15</li>
           <li><span class="ver">v0.9</span> <b>PIPELINE CREATED panel</b> — the missing leading indicator for the marketing↔sales handoff. Weekly NEW IN (green) vs OUT / closed / DQ'd (amber) bar pairs over the trailing 8 weeks, with a dashed target line ($13.5M/wk derived from quota × 3x coverage ÷ 13 weeks) and a red flag tick on any week below target (W1, W3, W7 in the current data). Header stat row shows THIS WK NET · TTW AVG NET · TARGET. Compact source-mix stacked bar below (outbound / inbound / partner / expansion). Pipegen ticker symbol and AI insight bullet added. `GO PIPE` / `GO PIPEGEN` commands · closes #12</li>
@@ -379,7 +381,7 @@
     <span class="seg right"><span class="l">SYS</span> <span id="clock2">--:--:--</span></span>
   </div>
 
-  <script src="data.js?v=0.11.0"></script>
-  <script src="app.js?v=0.11.0"></script>
+  <script src="data.js?v=0.12.0"></script>
+  <script src="app.js?v=0.12.0"></script>
 </body>
 </html>

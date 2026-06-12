@@ -383,6 +383,7 @@
     const weeks      = D.trend.weeks;
     const acc        = D.trend.forecastAccuracy || 0;
     const commitVals = motionOn ? D.trend.commit.map((v) => +(v * share).toFixed(2)) : D.trend.commit;
+    const bestVals   = motionOn ? D.trend.bestcase.map((v) => +(v * share).toFixed(2)) : D.trend.bestcase;
     const showBand   = series === "commit" && acc > 0;
 
     // Pace line: linear $0 → quotaQ across meta.weeksTotal weeks, sampled
@@ -393,6 +394,8 @@
     // motion lens, pace is scaled by share too — the question becomes
     // "is this motion on pace to deliver its share of quota?".
     const weeksTotal = (D.meta && D.meta.weeksTotal) || values.length;
+    const weekNow    = (D.meta && D.meta.weekNow) || values.length;
+    const weeksRem   = Math.max(0, weeksTotal - weekNow);
     const quotaQ     = (D.meta && D.meta.quotaQ)     || quota[quota.length - 1];
     let pace = D.trend.pace;
     if (!Array.isArray(pace) || pace.length !== values.length) {
@@ -400,16 +403,61 @@
     }
     if (motionOn) pace = pace.map((v) => +(v * share).toFixed(2));
 
-    const all = values.concat(quota);
+    /* ---------- PROJECTED Q-END COMMIT (#17) — transparent formula, not "AI" ----------
+       1. Start with running commit at W<weekNow>.
+       2. Add (bestcase - commit) × bestToCommitRate. The empirical share of
+          bestcase $$ that gets re-categorized to commit by Q-end is ~40%.
+       3. Subtract slippageRecurrencePct × historical slippage as a drag.
+       4. Band = ±TTM forecast accuracy on the midpoint.
+       Projected best = projected commit + remaining headroom (bestLast - commitLast).
+       All inputs are real fields on data.js → trend / slippage / meta. */
+    const BEST_TO_COMMIT = 0.40;
+    const SLIP_RECUR     = 0.30;
+    const commitLast = commitVals[commitVals.length - 1];
+    const bestLast   = bestVals[bestVals.length - 1];
+    const valuesLast = values[values.length - 1];
+    const slipTotal  = ((D.slippage && D.slippage.totalAmount) || 0) * (motionOn ? share : 1);
+    const slipDrag   = slipTotal * SLIP_RECUR;
+    const projCommitMid = +(commitLast + (bestLast - commitLast) * BEST_TO_COMMIT - slipDrag).toFixed(2);
+    const projCommitLo  = +(projCommitMid * (1 - acc)).toFixed(2);
+    const projCommitHi  = +(projCommitMid * (1 + acc)).toFixed(2);
+    const projBestMid   = +(projCommitMid + (bestLast - commitLast)).toFixed(2);
+    const projTargetMid = series === "commit" ? projCommitMid : projBestMid;
+    const projTargetLo  = series === "commit" ? projCommitLo  : +(projBestMid * (1 - acc)).toFixed(2);
+    const projTargetHi  = series === "commit" ? projCommitHi  : +(projBestMid * (1 + acc)).toFixed(2);
+
+    // W9..W13 linear-interp series (selected series + best/commit + pace).
+    const projSeries = [];
+    for (let i = 1; i <= weeksRem; i++) {
+      projSeries.push(+(valuesLast + (projTargetMid - valuesLast) * (i / Math.max(weeksRem,1))).toFixed(2));
+    }
+    const projCommitSeries = [];
+    for (let i = 1; i <= weeksRem; i++) {
+      projCommitSeries.push(+(commitLast + (projCommitMid - commitLast) * (i / Math.max(weeksRem,1))).toFixed(2));
+    }
+    const projPace = [];
+    for (let i = weekNow + 1; i <= weeksTotal; i++) {
+      projPace.push(+(quotaQ * (i / weeksTotal) * (motionOn ? share : 1)).toFixed(2));
+    }
+    const projQuota = [];
+    for (let i = 0; i < weeksRem; i++) projQuota.push(quota[quota.length - 1]);
+
+    // X-axis now spans the full quarter (weeksTotal positions). Existing
+    // series sits at indices 0..weekNow-1; projection sits at weekNow..weeksTotal-1.
+    const xCount = weeksTotal;
+    const allWeeks = weeks.concat(Array.from({length: weeksRem}, (_, i) => "W" + (weekNow + 1 + i)));
+
+    const all = values.concat(quota).concat(projSeries).concat(projPace);
     if (showBand) {
       for (const v of commitVals) all.push(v * (1 + acc));
+      for (const v of projCommitSeries) all.push(v * (1 + acc));
     }
     for (const v of pace) all.push(v);
     const max = Math.max(...all);
     const min = 0;
     const range = Math.max(max - min, 1);
     function toY(v) { return PADT + innerH - ((v - min) / range) * innerH; }
-    function toX(i) { return PADL + (i / (values.length - 1)) * innerW; }
+    function toX(i) { return PADL + (i / Math.max(xCount - 1, 1)) * innerW; }
 
     const grid = [];
     for (let i = 0; i <= 4; i++) {
@@ -418,7 +466,17 @@
       grid.push(`<line x1="${PADL}" y1="${y}" x2="${W - PADR}" y2="${y}"/>`);
       grid.push(`<text x="${PADL - 6}" y="${y + 3}" text-anchor="end">${v.toFixed(0)}</text>`);
     }
-    const xLabels = weeks.map((m, i) => `<text x="${toX(i)}" y="${H - 8}" text-anchor="middle">${esc(m)}</text>`).join("");
+    // Render every other week label when weeksTotal > 9 to keep axis legible.
+    const labelStride = xCount > 9 ? 2 : 1;
+    const xLabels = allWeeks.map((m, i) => (i % labelStride === 0 || i === xCount - 1)
+      ? `<text x="${toX(i)}" y="${H - 8}" text-anchor="middle">${esc(m)}</text>`
+      : ""
+    ).join("");
+    // Faint vertical "today" marker at weekNow boundary so the user sees
+    // where actuals end and projection begins.
+    const nowX = toX(weekNow - 1);
+    const nowMarker = `<line class="chart-now" x1="${nowX}" y1="${PADT}" x2="${nowX}" y2="${PADT + innerH}"/>
+      <text class="chart-now-lbl" x="${nowX + 4}" y="${PADT + 10}">NOW</text>`;
 
     let bandSvg = "";
     if (showBand) {
@@ -429,11 +487,47 @@
       }
       bandSvg = `<path class="chart-band" d="${upper}${lower} Z"/>`;
     }
+    // Projection band (dashed-outlined translucent area for W9..W13).
+    let projBandSvg = "";
+    if (showBand && projCommitSeries.length) {
+      // Anchor band at commitLast point so it visually continues from the actuals band.
+      const upperPoints = [{x: toX(commitVals.length - 1), y: toY(commitLast * (1 + acc))}]
+        .concat(projCommitSeries.map((v, i) => ({x: toX(commitVals.length + i), y: toY(v * (1 + acc))})));
+      const lowerPoints = [{x: toX(commitVals.length - 1), y: toY(commitLast * (1 - acc))}]
+        .concat(projCommitSeries.map((v, i) => ({x: toX(commitVals.length + i), y: toY(v * (1 - acc))})));
+      const up = upperPoints.map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
+      let dn = "";
+      for (let i = lowerPoints.length - 1; i >= 0; i--) {
+        dn += ` L${lowerPoints[i].x.toFixed(1)},${lowerPoints[i].y.toFixed(1)}`;
+      }
+      projBandSvg = `<path class="chart-band chart-band-proj" d="${up}${dn} Z"/>`;
+    }
 
     const linePath  = values.map((v, i) => `${i === 0 ? "M" : "L"}${toX(i).toFixed(1)},${toY(v).toFixed(1)}`).join(" ");
     const areaPath  = linePath + ` L${toX(values.length-1).toFixed(1)},${PADT+innerH} L${toX(0).toFixed(1)},${PADT+innerH} Z`;
-    const quotaPath = quota.map((v, i) => `${i === 0 ? "M" : "L"}${toX(i).toFixed(1)},${toY(v).toFixed(1)}`).join(" ");
-    const pacePath  = pace.map((v, i)  => `${i === 0 ? "M" : "L"}${toX(i).toFixed(1)},${toY(v).toFixed(1)}`).join(" ");
+    const quotaAll  = quota.concat(projQuota);
+    const quotaPath = quotaAll.map((v, i) => `${i === 0 ? "M" : "L"}${toX(i).toFixed(1)},${toY(v).toFixed(1)}`).join(" ");
+    const fullPace  = pace.concat(projPace);
+    const pacePath  = fullPace.map((v, i)  => `${i === 0 ? "M" : "L"}${toX(i).toFixed(1)},${toY(v).toFixed(1)}`).join(" ");
+
+    // Dashed projection extension — anchor at values[last] so it visually connects.
+    let projLineSvg = "";
+    if (projSeries.length) {
+      const anchorX = toX(values.length - 1);
+      const anchorY = toY(valuesLast);
+      const projPath = [`M${anchorX.toFixed(1)},${anchorY.toFixed(1)}`]
+        .concat(projSeries.map((v, i) => `L${toX(values.length + i).toFixed(1)},${toY(v).toFixed(1)}`))
+        .join(" ");
+      const projDots = projSeries.map((v, i) =>
+        `<circle class="chart-dot chart-dot-proj" cx="${toX(values.length + i).toFixed(1)}" cy="${toY(v).toFixed(1)}" r="2.5"/>`
+      ).join("");
+      // Endpoint marker showing projected Q-end value.
+      const endX = toX(xCount - 1);
+      const endY = toY(projTargetMid);
+      const endMarker = `<circle class="chart-proj-end" cx="${endX.toFixed(1)}" cy="${endY.toFixed(1)}" r="4"/>` +
+        `<text class="chart-proj-end-lbl" x="${(endX - 4).toFixed(1)}" y="${(endY - 8).toFixed(1)}" text-anchor="end">PROJ $${projTargetMid.toFixed(1)}M</text>`;
+      projLineSvg = `<path class="chart-line chart-line-proj" d="${projPath}"/>${projDots}${endMarker}`;
+    }
 
     const dots = values.map((v, i) => `<circle class="chart-dot" cx="${toX(i).toFixed(1)}" cy="${toY(v).toFixed(1)}" r="3"/>`).join("");
 
@@ -441,10 +535,13 @@
       <g class="chart-grid">${grid.join("")}</g>
       <g class="chart-axis">${xLabels}</g>
       ${bandSvg}
+      ${projBandSvg}
       <path class="chart-area" d="${areaPath}"/>
       <path class="chart-pace" d="${pacePath}"/>
       <path class="chart-line" d="${linePath}"/>
       <path class="chart-quota" d="${quotaPath}"/>
+      ${projLineSvg}
+      ${nowMarker}
       <g>${dots}</g>
     `;
 
@@ -452,13 +549,20 @@
     const target     = quota[quota.length - 1];
     const gap        = (last - target).toFixed(1);
     const gapCls     = gap >= 0 ? "green" : "red";
-    const weekNow    = (D.meta && D.meta.weekNow) || values.length;
     const paceNow    = pace[pace.length - 1];
     const paceDiff   = +(last - paceNow).toFixed(1);
     const paceCls    = paceDiff >= 0 ? "green" : "red";
     const paceArrow  = paceDiff >= 0 ? "▲" : "▼";
     const paceLabel  = paceDiff >= 0 ? "AHEAD" : "BEHIND";
     const paceAmt    = "$" + Math.abs(paceDiff).toFixed(1) + "M";
+    // Projection vs quota — tone bands per spec: green ≥ quota, amber ≥ 0.95×, red < 0.95×.
+    const projGapVsQuota = +(projTargetMid - target).toFixed(2);
+    const projTone = projTargetMid >= target ? "green"
+                   : projTargetMid >= target * 0.95 ? "amber" : "red";
+    const projGapArrow = projGapVsQuota >= 0 ? "▲" : "▼";
+    const projGapAbs   = Math.abs(projGapVsQuota).toFixed(1);
+    const projBandPct  = (acc * 100).toFixed(0);
+    const projMethTip  = `Projection = current ${series === "commit" ? "commit" : "best case"} + (bestcase − commit) × ${(BEST_TO_COMMIT*100).toFixed(0)}% − slippage drag (${(SLIP_RECUR*100).toFixed(0)}% recurrence on $${slipTotal.toFixed(1)}M). Band = ±${projBandPct}% TTM forecast accuracy.`;
 
     if (stat) {
       stat.innerHTML = `
@@ -468,17 +572,46 @@
         <div><span>GAP</span><b class="${gapCls}">${gap >= 0 ? "+" : ""}$${gap}M</b></div>
         <div><span>PACE W${weekNow}</span><b>$${paceNow.toFixed(1)}M</b></div>
         <div><span>vs PACE</span><b class="${paceCls}">${paceArrow} ${paceAmt} ${paceLabel}</b></div>
+        <div class="proj-block" title="${esc(projMethTip)}" aria-label="${esc(projMethTip)}">
+          <span class="proj-lbl">PROJ Q-END · ${series === "commit" ? "COMMIT" : "BEST"}</span>
+          <b class="proj-big ${projTone}">$${projTargetMid.toFixed(1)}M</b>
+          <span class="proj-range">RANGE $${projTargetLo.toFixed(1)}M – $${projTargetHi.toFixed(1)}M (±${projBandPct}%)</span>
+          <span class="proj-gap ${projTone}">${projGapArrow} ${projGapVsQuota >= 0 ? "+" : "-"}$${projGapAbs}M VS QUOTA</span>
+          ${series === "commit" ? `<span class="proj-best">BEST CASE → $${projBestMid.toFixed(1)}M</span>` : ""}
+        </div>
       `;
     }
     if (cap) {
       const pacePart = `Pace line: linear $0 → quota across ${weeksTotal} weeks. Above pace = ahead of plan.`;
+      const projPart = ` Dashed W${weekNow+1}-W${weeksTotal} = projected ${series === "commit" ? "commit" : "best case"} ($${projTargetMid.toFixed(1)}M Q-end midpoint).`;
       const motionPart = motionOn
         ? ` Showing ${MOTION_LABEL[currentMotion]} contribution to the unchanged company quota.`
         : "";
       cap.textContent = (showBand
         ? `Confidence band: ±${(acc * 100).toFixed(0)}% based on TTM forecast accuracy · ${pacePart}`
-        : pacePart) + motionPart;
+        : pacePart) + projPart + motionPart;
     }
+    // Refresh hero strip to incorporate the projection.
+    renderHeroSummary({ commit: commitLast, best: bestLast, quota: target, projCommit: projCommitMid, projBand: acc });
+  }
+
+  // Hero summary is re-rendered every time the chart renders so projection
+  // numbers stay in sync with motion lens / series toggle changes.
+  function renderHeroSummary(p) {
+    const el = $("hero-summary");
+    if (!el) return;
+    const projGap = p.projCommit - p.quota;
+    const projCls = projGap >= 0 ? "green" : projGap >= -1 ? "amber" : "red";
+    const projAbs = Math.abs(projGap).toFixed(1);
+    const bandAbs = (p.projCommit * p.projBand).toFixed(1);
+    el.innerHTML =
+      `Commit at <span class="green">$${p.commit.toFixed(1)}M</span> · ` +
+      `projected Q-end <span class="${projCls}">$${p.projCommit.toFixed(1)}M</span> ` +
+      `<span class="muted">±$${bandAbs}M</span> · ` +
+      `best case <span class="green">$${p.best.toFixed(1)}M</span> · ` +
+      `vs <span class="amber">$${p.quota.toFixed(0)}M quota</span>` +
+      (projGap >= 0 ? "" : ` · <span class="${projCls}">$${projAbs}M to close gap</span>`) +
+      ".";
   }
   function bindToggle() {
     document.querySelectorAll(".toggle").forEach((btn) => {

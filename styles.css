@@ -489,6 +489,14 @@ main { padding: 10px 12px 50px; max-width: 1600px; margin: 0 auto; }
 .chart-dot.cyan  { fill: var(--cyan); }
 .chart-quota { fill: none; stroke: var(--amber); stroke-width: 1.5; stroke-dasharray: 4 4; }
 .chart-pace  { fill: none; stroke: var(--dim);   stroke-width: 1.5; stroke-dasharray: 2 3; opacity: 0.9; }
+/* Projection extension (#17) — same color as selected series, dashed. */
+.chart-line-proj { stroke-dasharray: 5 4; stroke-width: 2; opacity: 0.9; }
+.chart-band-proj { fill-opacity: 0.10; }
+.chart-dot-proj  { fill: var(--green); opacity: 0.75; }
+.chart-proj-end  { fill: none; stroke: var(--green); stroke-width: 1.5; }
+.chart-proj-end-lbl { fill: var(--green); font-family: var(--mono); font-size: 9px; font-weight: 700; letter-spacing: 0.5px; }
+.chart-now       { stroke: var(--dim); stroke-width: 1; stroke-dasharray: 1 3; opacity: 0.5; }
+.chart-now-lbl   { fill: var(--dim); font-family: var(--mono); font-size: 9px; letter-spacing: 1px; }
 .chart-stat {
   position: absolute; top: 8px; right: 12px;
   display: flex; gap: 14px; font-size: 11px; flex-wrap: wrap; justify-content: flex-end;
@@ -496,12 +504,30 @@ main { padding: 10px 12px 50px; max-width: 1600px; margin: 0 auto; }
 }
 .chart-stat span { color: var(--dim); }
 .chart-stat b { color: var(--white); font-weight: 700; margin-left: 4px; }
+/* PROJECTED Q-END mini-stat (#17) — block style, sits in chart-stat row. */
+.chart-stat .proj-block {
+  display: flex; flex-direction: column; gap: 2px; padding-left: 14px;
+  border-left: 1px solid var(--border-2); align-items: flex-start;
+  cursor: help;
+}
+.chart-stat .proj-lbl   { color: var(--dim); font-size: 10px; letter-spacing: 1px; }
+.chart-stat .proj-big   { font-size: 16px; font-weight: 700; font-family: var(--mono); margin: 0; }
+.chart-stat .proj-big.green { color: var(--green); }
+.chart-stat .proj-big.amber { color: var(--amber); }
+.chart-stat .proj-big.red   { color: var(--red); }
+.chart-stat .proj-range { color: var(--dim); font-size: 10px; }
+.chart-stat .proj-gap   { font-size: 10px; font-weight: 700; }
+.chart-stat .proj-gap.green { color: var(--green); }
+.chart-stat .proj-gap.amber { color: var(--amber); }
+.chart-stat .proj-gap.red   { color: var(--red); }
+.chart-stat .proj-best  { color: var(--dim); font-size: 10px; }
 .chart-legend {
   display: flex; gap: 14px; padding: 0 14px 6px; font-size: 11px; color: var(--dim); flex-wrap: wrap;
 }
 .chart-legend .swatch { display: inline-block; width: 10px; height: 10px; vertical-align: middle; margin-right: 5px; }
 .chart-legend .swatch-band { background: var(--green-soft); opacity: 0.6; border: 1px solid var(--green-dim); }
 .chart-legend .swatch-pace { background: var(--dim); height: 2px; margin-bottom: 3px; }
+.chart-legend .swatch-proj { background: linear-gradient(90deg, var(--green) 0 6px, transparent 6px 10px); height: 2px; margin-bottom: 3px; }
 .chart-legend .swatch-pipe-target { background: var(--amber); height: 2px; margin-bottom: 3px; opacity: 0.9; }
 .chart-legend .swatch-pipe-miss   { background: var(--red); border-radius: 50%; width: 8px; height: 8px; }
 .chart-caption { padding: 0 14px 12px; font-size: 11px; color: var(--dim); min-height: 14px; }

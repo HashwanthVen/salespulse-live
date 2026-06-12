@@ -207,6 +207,7 @@ window.SALESPULSE_DATA = {
   insights: [
     [
       "Pipeline coverage is healthy at 3.1x, but Q2 commit-only stands at $55.9M vs $60M quota — best case is needed to hit number.",
+      "Projection model puts Q-end commit at $59.2M ±$4.1M — narrowly misses the $60M quota at the midpoint, with a $63.4M ceiling. Convert ~$2M of bestcase to commit by Wednesday to ride above the line. Action: pressure-test Contoso ($1.85M bestcase) and Tailwind ($0.98M bestcase) — they're the largest unconverted dollars.",
       "Commit recovered +$3.6M WoW ($52.3M → $55.9M) — almost entirely from S. Rivera jumping 92% → 102% attainment after closing 2 large deals; concentration risk if she misses next week.",
       "S. Rivera is the clear top performer at 102% attainment with the highest activity score.",
       "Negotiation→Closed Won conversion is strong at 71%; focus on accelerating Proposal→Negotiation (currently 58%).",
@@ -261,6 +262,7 @@ window.SALESPULSE_DATA = {
     { sym: "COV",      val: "3.1x",    chg: "+0.1" },
     { sym: "Q2COMMIT", val: "55.9M",   chg: "-4.1M" },
     { sym: "Q2BEST",   val: "69.8M",   chg: "+9.8M" },
+    { sym: "PROJ",     val: "59.2M",   chg: "±$4.1M Q-END" },
     { sym: "PIPEGEN",  val: "17.1M",   chg: "+8.6M NET" },
     { sym: "RIVERA",   val: "102%",    chg: "+2%" },
     { sym: "PATEL",    val: "88%",     chg: "+5%" },
