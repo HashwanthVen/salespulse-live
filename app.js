@@ -2925,13 +2925,195 @@
     if (a >= 65) return "amber";
     return "red";
   }
+  /* ============================================================
+     #36 TEAM ATTAIN · MANAGER ROLLUP (v0.28)
+     ------------------------------------------------------------
+     Closes the Sales Manager persona gap. 3 managers x 2 reps in
+     this dataset (spec assumed 12 reps; we have 6, so each mgr
+     owns 2). Metrics are COMPUTED from D.reps at render time so
+     drift stays impossible. Health formula:
+       0.35 * attain + 0.20 * (1 - |bias|/0.20)
+              + 0.20 * (1 - acc-err/0.15) + 0.15 * atRiskFactor
+              + 0.10 * 1   (coverage placeholder — full ratio TBD)
+     Banding matches #33 DEAL HEALTH SCORE: 80+ STRONG, 60+ OK,
+     40+ AT-RISK, <40 CRITICAL.
+     ============================================================ */
+  function managerForRep(repName) {
+    if (!D.managers) return null;
+    return D.managers.find((m) => (m.reportNames || []).indexOf(repName) >= 0) || null;
+  }
+  function repIsInManager(rep, mid) {
+    const m = D.managers && D.managers.find((x) => x.id === mid);
+    if (!m) return true;
+    return (m.reportNames || []).indexOf(rep.name) >= 0;
+  }
+  function mgrShortName(name) {
+    return (name || "").split(" ").map((p, i) => i === 0 ? p : p.slice(0, 1) + ".").join(" ");
+  }
+  function biasNum(b) {
+    if (b === "over-commit") return -0.06;
+    if (b === "sandbag")     return +0.06;
+    return 0.0;
+  }
+  function isRepAtRisk(r) {
+    return (r.attain || 0) < 70;
+  }
+  function computeManagerMetrics(m) {
+    const reps = (m.reportNames || []).map((n) => D.reps.find((r) => r.name === n)).filter(Boolean);
+    if (reps.length === 0) {
+      return { quotaSum: 0, attainSum: 0, attainPct: 0, pipeSum: 0, biasAvg: 0,
+               accuracyAvg: 0, atRiskRepCount: 0, healthScore: 0, repCount: 0 };
+    }
+    const quotaSum  = reps.reduce((s, r) => s + (r.quota || 0), 0);
+    const attainSum = reps.reduce((s, r) => s + (r.quota || 0) * (r.attain || 0) / 100, 0);
+    const pipeSum   = reps.reduce((s, r) => s + (r.pipeline || 0), 0);
+    const attainPct = quotaSum > 0 ? attainSum / quotaSum : 0;
+    const biases    = reps.map((r) => biasNum((r.forecastHistory || {}).bias));
+    const biasAvg   = biases.reduce((s, b) => s + b, 0) / reps.length;
+    const accs      = reps.map((r) => 100 - ((r.forecastHistory || {}).accuracy || 80));
+    const accErr    = (accs.reduce((s, a) => s + a, 0) / reps.length) / 100;
+    const atRiskRepCount = reps.filter(isRepAtRisk).length;
+    const atRiskFactor   = reps.length > 0 ? 1 - (atRiskRepCount / reps.length) : 1;
+    const healthRaw =
+        0.35 * Math.min(attainPct, 1.10)
+      + 0.20 * (1 - Math.min(Math.abs(biasAvg), 0.20) / 0.20)
+      + 0.20 * (1 - Math.min(accErr, 0.15) / 0.15)
+      + 0.15 * atRiskFactor
+      + 0.10 * 1.0;
+    const healthScore = Math.round(healthRaw * 100);
+    return { quotaSum: quotaSum, attainSum: attainSum, attainPct: attainPct,
+             pipeSum: pipeSum, biasAvg: biasAvg, accuracyAvg: accErr,
+             atRiskRepCount: atRiskRepCount, healthScore: healthScore, repCount: reps.length };
+  }
+  function mgrBand(s) {
+    if (s >= 80) return { cls: "h-strong",   glyph: "★", label: "STRONG"   };
+    if (s >= 60) return { cls: "h-ok",       glyph: "●", label: "OK"       };
+    if (s >= 40) return { cls: "h-atrisk",   glyph: "⚠", label: "AT-RISK"  };
+    return         { cls: "h-critical", glyph: "⛔", label: "CRITICAL" };
+  }
+  let managerFilterActive = (function () {
+    try { return localStorage.getItem("salespulse.managerFilter") || ""; } catch (e) { return ""; }
+  })();
+  function applyManagerFilter(mid) {
+    if (managerFilterActive === mid) {
+      managerFilterActive = "";
+    } else {
+      managerFilterActive = mid;
+    }
+    try { localStorage.setItem("salespulse.managerFilter", managerFilterActive); } catch (e) {}
+    renderReps();
+    renderTeamAttain();
+    const reps = document.getElementById("reps");
+    if (reps && managerFilterActive) {
+      reps.scrollIntoView({ behavior: "smooth", block: "start" });
+      reps.classList.add("pulse-soft");
+      setTimeout(() => reps.classList.remove("pulse-soft"), 1500);
+    }
+  }
+  function renderTeamAttain() {
+    const host = $("team-attain-body");
+    if (!host || !D.managers) return;
+    const rows = D.managers.map((m) => ({ m: m, x: computeManagerMetrics(m) }));
+    rows.sort((a, b) => b.x.healthScore - a.x.healthScore);
+    const totalQuota   = rows.reduce((s, r) => s + r.x.quotaSum,  0);
+    const totalAttain  = rows.reduce((s, r) => s + r.x.attainSum, 0);
+    const totalPipe    = rows.reduce((s, r) => s + r.x.pipeSum,   0);
+    const totalAtRisk  = rows.reduce((s, r) => s + r.x.atRiskRepCount, 0);
+    const repsQuotaSum = D.reps.reduce((s, r) => s + (r.quota || 0), 0);
+    const mismatch = Math.abs(totalQuota - repsQuotaSum) > 100000;
+    const head = `
+      <table class="data-table team-attain-table">
+        <thead><tr>
+          <th>MGR (TEAM)</th>
+          <th class="num">QUOTA</th>
+          <th class="num">ATTAIN</th>
+          <th class="num">%</th>
+          <th class="num">PIPE</th>
+          <th class="num" title="Average forecast bias across direct reports">BIAS</th>
+          <th class="num" title="Average forecast accuracy error across direct reports">ACC</th>
+          <th class="num" title="Reps below 70% attain">AT-RISK</th>
+          <th class="num" title="Manager health score 0-100 — see tooltip">HEALTH</th>
+        </tr></thead>
+        <tbody>`;
+    const body = rows.map(({ m, x }) => {
+      const b = mgrBand(x.healthScore);
+      const attainClass = x.attainPct >= 0.90 ? "green" : x.attainPct >= 0.70 ? "amber" : "red";
+      const attainGlyph = x.attainPct >= 0.95 ? " ★" : x.attainPct < 0.70 ? " ⚠" : "";
+      const biasStr = (x.biasAvg >= 0 ? "+" : "") + (x.biasAvg * 100).toFixed(1) + "%";
+      const accStr  = "±" + (x.accuracyAvg * 100).toFixed(1) + "%";
+      const accCls  = x.accuracyAvg < 0.06 ? "green" : x.accuracyAvg < 0.09 ? "amber" : "red";
+      const accGlyph = x.accuracyAvg < 0.05 ? " ★" : x.accuracyAvg > 0.085 ? " ⚠" : "";
+      const arCell = x.atRiskRepCount > 0 ? `<span class="red">${x.atRiskRepCount} ⚠</span>` : `${x.atRiskRepCount}`;
+      const tip = `${m.title} · ${x.repCount} reps · health = 0.35*attain + 0.20*(1-|bias|/0.20) + 0.20*(1-accErr/0.15) + 0.15*atRiskFactor + 0.10 → ${x.healthScore}/100`;
+      const activeCls = managerFilterActive === m.id ? " active" : "";
+      return `
+        <tr class="ta-row${activeCls}" data-mgr="${esc(m.id)}" title="${esc(tip)}">
+          <td><b class="green">${esc(m.name)}</b> <span class="muted">(${esc(m.title.replace(/^RVP, ?/, ""))})</span></td>
+          <td class="num">$${(x.quotaSum/1e6).toFixed(1)}M</td>
+          <td class="num">$${(x.attainSum/1e6).toFixed(1)}M</td>
+          <td class="num ${attainClass}">${(x.attainPct*100).toFixed(1)}%${attainGlyph}</td>
+          <td class="num">$${(x.pipeSum/1e6).toFixed(1)}M</td>
+          <td class="num ${Math.abs(x.biasAvg) < 0.03 ? "green" : "amber"}">${biasStr}</td>
+          <td class="num ${accCls}">${accStr}${accGlyph}</td>
+          <td class="num">${arCell}</td>
+          <td class="num ${b.cls}"><b>${x.healthScore}</b> ${b.glyph}</td>
+        </tr>`;
+    }).join("");
+    const portfolioAttain = totalQuota > 0 ? totalAttain / totalQuota : 0;
+    const foot = `
+        </tbody>
+        <tfoot><tr class="ta-total">
+          <td><b>TOTAL</b></td>
+          <td class="num">$${(totalQuota/1e6).toFixed(1)}M</td>
+          <td class="num">$${(totalAttain/1e6).toFixed(1)}M</td>
+          <td class="num">${(portfolioAttain*100).toFixed(1)}%</td>
+          <td class="num">$${(totalPipe/1e6).toFixed(1)}M</td>
+          <td class="num muted">—</td>
+          <td class="num muted">—</td>
+          <td class="num">${totalAtRisk}</td>
+          <td class="num">—</td>
+        </tr></tfoot>
+      </table>`;
+    const chip = managerFilterActive
+      ? `<div class="ta-chip" id="ta-chip">FILTERED TO <b>${esc((D.managers.find((m) => m.id === managerFilterActive) || {}).name || "")}</b>'S TEAM <span class="ta-x" title="Clear filter">✕</span></div>`
+      : "";
+    const mm = mismatch ? `<div class="ta-mismatch">⚠ MISMATCH · Σ(manager quota) $${(totalQuota/1e6).toFixed(2)}M vs total rep quota $${(repsQuotaSum/1e6).toFixed(2)}M</div>` : "";
+    host.innerHTML = chip + head + body + foot + mm;
+    rows.forEach(({ m }) => {
+      const tr = host.querySelector(`tr[data-mgr="${m.id}"]`);
+      if (tr) tr.addEventListener("click", (e) => {
+        e.preventDefault();
+        applyManagerFilter(m.id);
+      });
+    });
+    const chipEl = host.querySelector(".ta-chip");
+    if (chipEl) chipEl.addEventListener("click", () => applyManagerFilter(managerFilterActive));
+  }
+  function managerInsightBullet() {
+    if (!D.managers || !D.managers.length) return null;
+    const rows = D.managers.map((m) => ({ m: m, x: computeManagerMetrics(m) }));
+    rows.sort((a, b) => b.x.healthScore - a.x.healthScore);
+    const best = rows[0];
+    const worst = rows[rows.length - 1];
+    if (!best || !worst || best.m.id === worst.m.id) return null;
+    const gap = ((best.x.attainPct - worst.x.attainPct) * 100).toFixed(0);
+    return `Manager rollup: ${best.m.name}'s team strongest at ${(best.x.attainPct*100).toFixed(0)}% attain (health ${best.x.healthScore}). ${worst.m.name}'s team at ${(worst.x.attainPct*100).toFixed(0)}% (-${gap}pp gap) — ${worst.x.atRiskRepCount} of ${worst.x.repCount} reps at-risk. Recommended: 1:1 with ${worst.m.name} this week on coaching plan.`;
+  }
+
   function renderReps() {
     const tbody = $("reps-tbody");
     if (!tbody) return;
-    tbody.innerHTML = D.reps.map((r) => {
+    const rowsSrc = managerFilterActive
+      ? D.reps.filter((r) => repIsInManager(r, managerFilterActive))
+      : D.reps;
+    tbody.innerHTML = rowsSrc.map((r) => {
       const attainCls = r.attain >= 90 ? "" : r.attain >= 70 ? "warn" : "bad";
       const actCls    = r.activity >= 80 ? "green" : r.activity >= 65 ? "amber" : "red";
       const fh        = r.forecastHistory || null;
+      const mgr       = managerForRep(r.name);
+      const mgrCell   = mgr
+        ? `<td class="mgr-cell" title="${esc(mgr.title)}">${esc(mgrShortName(mgr.name))}</td>`
+        : `<td class="muted">—</td>`;
       const accCell   = fh
         ? `<td class="num ${fcstAccCls(fh.accuracy)}" title="Last 4Q forecast accuracy">${fh.accuracy}%</td>`
         : `<td class="num muted">—</td>`;
@@ -2948,6 +3130,7 @@
       return `
         <tr data-rep="${esc(r.name)}">
           <td><b class="green">${esc(r.name)}</b></td>
+          ${mgrCell}
           <td>${esc(r.region)}</td>
           <td class="num">$${formatK(r.quota)}</td>
           <td>
@@ -3225,6 +3408,10 @@
     try {
       const ph = portfolioHealthInsightBullet();
       if (ph) items.unshift(ph);
+    } catch (e) {}
+    try {
+      const mg = managerInsightBullet();
+      if (mg) items.unshift(mg);
     } catch (e) {}
     try {
       const sb = scenarioInsightBullet();
@@ -3837,7 +4024,8 @@
       "GO NOTES": "release",
       "GO WL": "winloss", "GO WINLOSS": "winloss", "GO WIN": "winloss",
       "GO BENCH": "benchmarks", "GO BENCHMARKS": "benchmarks",
-      "GO SCN": "scenario", "GO SCENARIO": "scenario", "GO WHATIF": "scenario"
+      "GO SCN": "scenario", "GO SCENARIO": "scenario", "GO WHATIF": "scenario",
+      "GO TEAM": "team-attain", "GO TEAMS": "team-attain", "GO MGR": "team-attain", "GO MANAGERS": "team-attain"
     };
     if (goMap[cmd]) { const el = document.getElementById(goMap[cmd]); if (el) el.scrollIntoView({ behavior: "smooth", block: "start" }); return; }
     if (cmd === "FCST COMMIT" || cmd === "FORECAST COMMIT") { setSeries("commit"); return; }
@@ -4001,8 +4189,8 @@
   // Each value = the set of panel IDs visible for that persona. "full" = null
   // means everything visible (no hide rules emitted).
   const LENS_MAP = {
-    cro:   new Set(["inbox","dashboard","benchmarks","forecast","scenario","changed","yoy","forward-cov","at-risk-reps","slippage","winloss","insights","audience","release"]),
-    mgr:   new Set(["inbox","dashboard","funnel","deals","scenario","reps","at-risk-reps","slippage","changed","winloss","insights","release"]),
+    cro:   new Set(["inbox","dashboard","benchmarks","forecast","scenario","changed","yoy","forward-cov","at-risk-reps","team-attain","reps","slippage","winloss","insights","audience","release"]),
+    mgr:   new Set(["inbox","dashboard","funnel","deals","scenario","team-attain","reps","at-risk-reps","slippage","changed","winloss","insights","release"]),
     ae:    new Set(["inbox","dashboard","deals","insights","release"]),
     cfo:   new Set(["dashboard","benchmarks","forecast","scenario","yoy","slippage","winloss","release"]),
     cmo:   new Set(["dashboard","benchmarks","pipegen","funnel","segments","winloss","insights","release"]),
@@ -4011,7 +4199,7 @@
   };
   const ALL_PANEL_IDS = [
     "inbox","changed","yoy","dashboard","benchmarks","funnel","forecast","scenario","deals","slippage",
-    "pipegen","forward-cov","at-risk-reps","reps","segments","winloss","risks","insights","audience","release"
+    "pipegen","forward-cov","at-risk-reps","team-attain","reps","segments","winloss","risks","insights","audience","release"
   ];
   const LENS_SHORTCUT_ORDER = ["cro","mgr","ae","cfo","cmo","board","full"];
   const LENS_INSIGHT_INTRO = {
@@ -4172,6 +4360,7 @@
     bindDealRowExpand();
     renderMomentumHeatmap();
     renderReps();
+    renderTeamAttain();
     renderAtRiskReps();
     renderSegments();
     renderRegions();

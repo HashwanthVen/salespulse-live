@@ -2302,3 +2302,57 @@ th#th-health.sorted { color: var(--green); }
   .portfolio-health .ph-buckets { gap: 4px; }
   .portfolio-health .ph-bucket { font-size: 10px; padding: 2px 5px; }
 }
+
+
+/* ==========================================================================
+   #36 TEAM ATTAIN · MANAGER ROLLUP (v0.28)
+   ========================================================================== */
+.team-attain-body { font-size: 11.5px; }
+.team-attain-body .data-table { width: 100%; border-collapse: collapse; }
+.team-attain-body .data-table th,
+.team-attain-body .data-table td { padding: 4px 8px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.team-attain-body .data-table th {
+  text-align: left; color: var(--dim); font-weight: 500;
+  letter-spacing: 0.4px; font-size: 10.5px;
+}
+.team-attain-body .data-table td.num,
+.team-attain-body .data-table th.num { text-align: right; }
+.team-attain-body .ta-row { cursor: pointer; transition: background 0.15s; }
+.team-attain-body .ta-row:hover { background: rgba(255,255,255,0.025); }
+.team-attain-body .ta-row.active { background: rgba(99,180,99,0.06); border-left: 2px solid var(--green); }
+.team-attain-body .ta-total td { font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--dim); border-top: 1px solid var(--border); border-bottom: none; padding-top: 6px; }
+.team-attain-body .h-strong   { color: var(--green); }
+.team-attain-body .h-ok       { color: var(--green); opacity: 0.85; }
+.team-attain-body .h-atrisk   { color: var(--amber); }
+.team-attain-body .h-critical { color: var(--red); }
+.team-attain-body .ta-chip {
+  display: inline-block; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10.5px; padding: 2px 7px; border: 1px solid var(--green);
+  color: var(--green); background: rgba(99,180,99,0.06);
+  letter-spacing: 0.3px; cursor: pointer; margin-bottom: 8px;
+}
+.team-attain-body .ta-chip:hover { background: rgba(99,180,99,0.12); }
+.team-attain-body .ta-chip .ta-x { opacity: 0.7; margin-left: 6px; }
+.team-attain-body .ta-mismatch {
+  display: inline-block; margin-top: 6px; padding: 1px 6px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px; color: var(--amber); border: 1px solid var(--amber);
+}
+.mgr-cell {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px; color: var(--dim);
+}
+#reps.pulse-soft { animation: ta-pulse 1.5s ease-out; }
+@keyframes ta-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(99,180,99,0.30); }
+  50% { box-shadow: 0 0 0 8px rgba(99,180,99,0); }
+  100% { box-shadow: 0 0 0 0 rgba(99,180,99,0); }
+}
+@media (max-width: 480px) {
+  .team-attain-body .data-table th:nth-child(6),
+  .team-attain-body .data-table td:nth-child(6),
+  .team-attain-body .data-table th:nth-child(7),
+  .team-attain-body .data-table td:nth-child(7) { display: none; }
+  .mgr-cell { font-size: 10px; }
+}

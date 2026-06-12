@@ -268,6 +268,24 @@ window.SALESPULSE_DATA = {
       forecastHistory: { accuracy: 68, bias: "sandbag",    last4Q: [+22, +18, +25, +19] } }
   ],
 
+  /* MANAGER ROLLUP (#36 TEAM ATTAIN). 3 RVPs each owning 2 reps from D.reps.
+     Sales Manager persona was the largest remaining persona gap — every
+     shipped feature scaffolds rep-level (#19/21) or deal-level (#14/20/27/33)
+     or org-level (KPIs). This adds the missing middle layer so the CRO can
+     answer "which manager is strongest/weakest?" in one glance.
+     Manager metrics (quotaSum, attainSum, attainPct, accuracyAvg, biasAvg,
+     atRiskCount, healthScore) are COMPUTED at render time from D.reps so
+     they stay reconciled — DO NOT hardcode aggregates. Reconciliation guard
+     fires if Σ(manager.quotaSum) drifts from total D.reps quota by > $0.1M.
+     Story: Park's West team strongest (Rivera 102% + Patel 88% = ~95%);
+     Liu's East team weakest (Okafor 64% + Sokolova 41% = ~53% with 2 at-risk);
+     Tan's Mid-Market team mid (Chen 76% + Yamada 58% = ~67% with 1 at-risk). */
+  managers: [
+    { id: "mgr-park", name: "C. Park",  title: "RVP, Enterprise West", reportNames: ["S. Rivera", "L. Patel"] },
+    { id: "mgr-liu",  name: "M. Liu",   title: "RVP, Enterprise East", reportNames: ["J. Okafor", "E. Sokolova"] },
+    { id: "mgr-tan",  name: "D. Tan",   title: "RVP, Mid-Market",      reportNames: ["M. Chen", "K. Yamada"] }
+  ],
+
   /* Pipeline by Segment */
   segments: [
     { name: "Enterprise",  value: 96.4, deals: 38, share: 52 },
