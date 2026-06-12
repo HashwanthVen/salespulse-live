@@ -1237,6 +1237,329 @@
     return `REACH risk: ${top.account} ($${amt}M) is single-threaded — only ${reachEngagedCount(top)} stakeholder${reachEngagedCount(top) === 1 ? "" : "s"} engaged. Single-threaded deals win ~18% vs ~47% for ≥5 stakeholders (Gartner 2024). Action: schedule an exec-sponsor intro this week.`;
   }
 
+  /* ---------- DEAL DETAIL EXPANDER (#32) ----------
+     Bloomberg DES-style inline expander on TOP OPEN DEALS. Click any row
+     to inline-expand a 3-column detail box (activity timeline + MEDDIC
+     breakdown + stakeholders) plus a notes line. Arrow keys navigate
+     between deals while one is expanded. State persisted in localStorage.
+     Mobile drops the inline expander in favor of a modal overlay. */
+  const LS_EXPAND_KEY = "salespulse.expandedDealId";
+  let expandedDealIds = (function () {
+    try {
+      const v = localStorage.getItem(LS_EXPAND_KEY);
+      if (!v) return new Set();
+      return new Set(v.split("||").filter(Boolean));
+    } catch (e) { return new Set(); }
+  })();
+  function persistExpanded() {
+    try { localStorage.setItem(LS_EXPAND_KEY, [...expandedDealIds].join("||")); } catch (e) {}
+  }
+  const ACTIVITY_GLYPH = { email: "✉", call: "☎", meeting: "⌘", note: "✎" };
+  function relDay(daysAgo) {
+    // Mock as-of June 12, 2026 (matches data.js meta).
+    const today = new Date(2026, 5, 12);
+    const d = new Date(today.getTime() - daysAgo * 86400000);
+    return String(d.getMonth() + 1).padStart(2, "0") + "/" + String(d.getDate()).padStart(2, "0");
+  }
+  function buildActivityTimeline(d) {
+    // 8 synthesized events going back from `lastTouchDays`. Mix of
+    // email/call/meeting based on touchpoints14d intensity + stage.
+    const lt = (d.engagement && d.engagement.lastTouchDays) || 7;
+    const tp = (d.engagement && d.engagement.touchpoints14d) || 3;
+    const owner = d.owner || "Owner";
+    const stage = (d.stage || "").toLowerCase();
+    const next  = (d.nextStep && d.nextStep.action) || null;
+    const pool = [];
+    if (next) pool.push({ daysAgo: 0,      kind: "note",    actor: owner, summary: "Next step queued: " + next });
+    pool.push({ daysAgo: lt,                kind: "email",   actor: owner, summary: stage === "negotiation" ? "Legal redlines / pricing follow-up" : (stage === "proposal" ? "Sent proposal" : "Follow-up touch") });
+    pool.push({ daysAgo: lt + 3,            kind: "call",    actor: owner, summary: stage === "negotiation" ? "45min — pricing concerns; champion bought-in" : "Discovery / qualification call" });
+    pool.push({ daysAgo: lt + 7,            kind: "meeting", actor: owner + " + champion", summary: stage === "negotiation" ? "Demo for finance team" : "Stakeholder workshop" });
+    pool.push({ daysAgo: lt + 11,           kind: "email",   actor: owner, summary: "Proposal sent" });
+    pool.push({ daysAgo: lt + 14,           kind: "call",    actor: owner, summary: "Champion sync" });
+    pool.push({ daysAgo: lt + 17,           kind: "meeting", actor: owner, summary: "Scoping workshop" });
+    pool.push({ daysAgo: lt + 21,           kind: "email",   actor: owner, summary: "Intro deck sent" });
+    pool.push({ daysAgo: lt + 25,           kind: "call",    actor: owner, summary: "Discovery call" });
+    return pool.slice(0, 8);
+  }
+  function dealExtras(d) {
+    return (D.dealDetailExtras && D.dealDetailExtras[d.account]) || null;
+  }
+  function meddicBreakdownTable(d) {
+    // Renders 8 MEDDPICC letters as a stacked list with note from extras.
+    const extras = dealExtras(d);
+    const notes  = (extras && extras.meddicNotes) || {};
+    return MEDDIC_ORDER.map((k) => {
+      const on  = !!(d.meddic && d.meddic[k]);
+      const lbl = MEDDIC_LABEL[k] || k;
+      const glyph = on ? "★" : "⚠";
+      const cls   = on ? "on"  : "off";
+      const tone  = on ? "green" : "amber";
+      const note  = notes[k] || (on ? "complete" : "missing");
+      // Use the first letter of the MEDDIC key as the compact letter
+      const letter = (k === "D1" ? "D"  : k === "D2" ? "Dp" : k === "Cm" ? "Cp" : k);
+      return `<div class="expander-meddic-row ${cls}"><span class="exp-meddic-letter ${tone}">${letter}</span> <span class="exp-meddic-glyph ${tone}">${glyph}</span> <span class="exp-meddic-note">${esc(note)}</span></div>`;
+    }).join("");
+  }
+  function stakeholderTable(d) {
+    if (!d.reach) return `<div class="expander-empty">no reach data</div>`;
+    const extras = dealExtras(d);
+    const names = (extras && extras.roleNames) || {};
+    return REACH_ROLES.map((r) => {
+      const score = +(d.reach[r.key] || 0);
+      const stateCls = score === 2 ? "engaged" : score === 1 ? "touched" : "missing";
+      const glyph    = score === 2 ? "★" : score === 1 ? "●" : "⚠";
+      const tone     = score === 2 ? "green" : score === 1 ? "amber" : "red";
+      const entry    = names[r.key];
+      let label = "— MISSING —";
+      if (entry && entry.name) {
+        label = `${esc(entry.name)} <span class="exp-stake-title">(${esc(entry.title || "")})</span>`;
+      } else if (score > 0) {
+        label = "— UNNAMED —";
+      }
+      return `<div class="expander-stake-row ${stateCls}"><span class="exp-stake-role">${esc(r.letter)}</span> <span class="exp-stake-glyph ${tone}">${glyph}</span> <span class="exp-stake-name">${label}</span></div>`;
+    }).join("");
+  }
+  function activityTable(d) {
+    const events = buildActivityTimeline(d);
+    return events.map((e) => {
+      const dateLbl = e.daysAgo === 0 ? "TODAY" : relDay(e.daysAgo);
+      return `<div class="expander-act-row"><span class="exp-act-date">${esc(dateLbl)}</span> <span class="exp-act-icon">${ACTIVITY_GLYPH[e.kind] || "·"}</span> <span class="exp-act-summary">${esc(e.summary)}</span></div>`;
+    }).join("");
+  }
+  function meddicReconChip(d) {
+    // Cross-check sum-of-extras-notes-having-strong-status against the
+    // shipped #20 aggregate.
+    const aggregate = qualScore(d);
+    const extras = dealExtras(d);
+    if (!extras || !extras.meddicNotes) return "";
+    const strongs = MEDDIC_ORDER.filter((k) => {
+      const note = extras.meddicNotes[k] || "";
+      return !!d.meddic[k] && !/^⚠/.test(note);
+    }).length;
+    if (Math.abs(strongs - aggregate) > 1) {
+      return `<span class="expander-mismatch" title="Detail sum ${strongs}/8 vs row aggregate ${aggregate}/8">⚠ MISMATCH (detail ${strongs}/8 vs row ${aggregate}/8)</span>`;
+    }
+    return "";
+  }
+  function buildExpanderHTML(d) {
+    const q     = qualScore(d);
+    const score = reachScore(d);
+    const status= reachStatus(score, d.motion);
+    const extras = dealExtras(d);
+    const notes = (extras && extras.notes) || "No notes recorded.";
+    const recon = meddicReconChip(d);
+    const stage = (d.stage || "").toUpperCase();
+    const owner = d.owner || "—";
+    const days  = (d.engagement && d.engagement.lastTouchDays) || 0;
+    const headTone = (d.forecast || "").toLowerCase() === "commit" ? "green" : (d.forecast || "").toLowerCase() === "bestcase" ? "amber" : "red";
+    return `
+      <div class="expander-inner" role="region" aria-label="Deal detail for ${esc(d.account)}">
+        <div class="expander-head">
+          <span class="exp-head-chev">▼</span>
+          <b class="${headTone}">${esc(d.account)}</b>
+          <span class="exp-head-sep">·</span>
+          <span class="exp-head-amt">$${formatK(d.amount)}</span>
+          <span class="exp-head-sep">·</span>
+          <span>${esc(owner)}</span>
+          <span class="exp-head-sep">·</span>
+          <span>${esc(stage)} (${days}d last touch)</span>
+          ${recon}
+          <button type="button" class="exp-collapse-btn" data-expander-close="${esc(d.account)}" aria-label="Collapse">▲ COLLAPSE</button>
+        </div>
+        <div class="expander-grid">
+          <div class="expander-col">
+            <div class="expander-col-title">ACTIVITY (last 8)</div>
+            ${activityTable(d)}
+          </div>
+          <div class="expander-col">
+            <div class="expander-col-title">MEDDIC ${q}/8 ${q < 5 ? "⚠" : "★"}</div>
+            ${meddicBreakdownTable(d)}
+          </div>
+          <div class="expander-col">
+            <div class="expander-col-title">STAKEHOLDERS · REACH ${(score*100).toFixed(0)}% ${status}</div>
+            ${stakeholderTable(d)}
+          </div>
+        </div>
+        <div class="expander-notes">
+          <b>NOTES:</b> ${esc(notes)}
+        </div>
+        <div class="expander-actions">
+          <button type="button" class="exp-action-btn" data-expander-jump-rep="${esc(d.owner)}">JUMP TO REPS →</button>
+          <button type="button" class="exp-action-btn" data-expander-jump-scn="${esc(d.account)}">SCENARIO →</button>
+        </div>
+      </div>
+    `;
+  }
+  function isMobileExpand() {
+    try { return window.matchMedia && window.matchMedia("(max-width: 480px)").matches; }
+    catch (e) { return false; }
+  }
+  function closeMobileExpander() {
+    const modal = document.getElementById("deal-expand-modal");
+    if (modal && modal.parentNode) modal.parentNode.removeChild(modal);
+  }
+  function openMobileExpander(d) {
+    closeMobileExpander();
+    const wrap = document.createElement("div");
+    wrap.id = "deal-expand-modal";
+    wrap.className = "deal-expand-modal";
+    wrap.innerHTML = `<div class="deal-expand-modal-backdrop" data-close="1"></div><div class="deal-expand-modal-body">${buildExpanderHTML(d)}</div>`;
+    document.body.appendChild(wrap);
+    wrap.addEventListener("click", (ev) => {
+      if (ev.target && ev.target.dataset && ev.target.dataset.close) closeMobileExpander();
+    });
+    bindExpanderInner(wrap, d);
+  }
+  function bindExpanderInner(scope, d) {
+    scope.querySelectorAll("[data-expander-close]").forEach((b) => {
+      b.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const acc = b.getAttribute("data-expander-close");
+        if (isMobileExpand()) { closeMobileExpander(); return; }
+        collapseRow(acc);
+      });
+    });
+    scope.querySelectorAll("[data-expander-jump-rep]").forEach((b) => {
+      b.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const owner = b.getAttribute("data-expander-jump-rep");
+        const repsRow = document.querySelector(`#reps-tbody tr[data-rep="${owner}"]`);
+        const repsPanel = document.getElementById("reps");
+        if (repsPanel && repsPanel.scrollIntoView) repsPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+        if (repsRow) {
+          repsRow.classList.remove("highlight-pulse");
+          void repsRow.offsetWidth;
+          repsRow.classList.add("highlight-pulse");
+        }
+      });
+    });
+    scope.querySelectorAll("[data-expander-jump-scn]").forEach((b) => {
+      b.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const scn = document.getElementById("scenario");
+        if (scn && scn.scrollIntoView) scn.scrollIntoView({ behavior: "smooth", block: "start" });
+        if (scn) {
+          scn.classList.remove("highlight-pulse");
+          void scn.offsetWidth;
+          scn.classList.add("highlight-pulse");
+        }
+      });
+    });
+  }
+  function expanderColspan() { return 14; }
+  function expandRow(account, multi) {
+    const tbody = $("deals-tbody"); if (!tbody) return;
+    const tr = tbody.querySelector(`tr[data-account="${cssEsc(account)}"]`);
+    if (!tr) return;
+    const d = (D.topDeals || []).find((x) => x.account === account);
+    if (!d) return;
+    if (isMobileExpand()) { openMobileExpander(d); return; }
+    if (!multi) {
+      // Collapse all others first.
+      [...expandedDealIds].forEach((id) => { if (id !== account) collapseRow(id, true); });
+      expandedDealIds.clear();
+    }
+    expandedDealIds.add(account);
+    persistExpanded();
+    // Inject the expander row right after the target row.
+    if (tr.nextSibling && tr.nextSibling.classList && tr.nextSibling.classList.contains("expander-row")) {
+      tr.nextSibling.parentNode.removeChild(tr.nextSibling);
+    }
+    const expRow = document.createElement("tr");
+    expRow.className = "expander-row";
+    expRow.dataset.expanderFor = account;
+    expRow.innerHTML = `<td colspan="${expanderColspan()}">${buildExpanderHTML(d)}</td>`;
+    tr.parentNode.insertBefore(expRow, tr.nextSibling);
+    tr.classList.add("row-expanded");
+    bindExpanderInner(expRow, d);
+    // Update AI INSIGHTS to a deal-specific bullet.
+    currentExpandedDealForInsight = account;
+    try { renderInsight(); } catch (e) {}
+  }
+  function collapseRow(account, suppressInsight) {
+    const tbody = $("deals-tbody"); if (!tbody) return;
+    expandedDealIds.delete(account);
+    persistExpanded();
+    const expRow = tbody.querySelector(`tr.expander-row[data-expander-for="${cssEsc(account)}"]`);
+    if (expRow && expRow.parentNode) expRow.parentNode.removeChild(expRow);
+    const tr = tbody.querySelector(`tr[data-account="${cssEsc(account)}"]`);
+    if (tr) tr.classList.remove("row-expanded");
+    if (!suppressInsight) {
+      if (currentExpandedDealForInsight === account) currentExpandedDealForInsight = null;
+      try { renderInsight(); } catch (e) {}
+    }
+  }
+  function cssEsc(s) {
+    // Simple selector-safe escape (account names only — quotes / backslashes).
+    return String(s).replace(/(["\\])/g, "\\$1");
+  }
+  let currentExpandedDealForInsight = null;
+  function expandedDealInsightBullet() {
+    if (!currentExpandedDealForInsight) return null;
+    const d = (D.topDeals || []).find((x) => x.account === currentExpandedDealForInsight);
+    if (!d) return null;
+    const ex = dealExtras(d);
+    const score = reachScore(d);
+    const reachWord = score < 0.4 ? "single-thread risk" : (score < 0.7 ? "OK reach" : "STRONG reach");
+    const q = qualScore(d);
+    const action = (ex && ex.notes && ex.notes.split(/Recommended|Risk:/)[1])
+      ? ((ex.notes.split(/Recommended/)[1] || "").trim().slice(0, 200))
+      : "review next-step queue";
+    return `${d.account} expanded: MEDDIC ${q}/8, REACH ${(score*100).toFixed(0)}% (${reachWord}). ${ex && ex.notes ? ex.notes : ""}`.trim();
+  }
+  function bindDealRowExpand() {
+    const tbody = $("deals-tbody"); if (!tbody) return;
+    // Click handler for ACCOUNT cell (first td) — clicking other cells
+    // doesn't expand (so REACH-cell jump etc still work).
+    tbody.addEventListener("click", (ev) => {
+      // Don't hijack clicks on form controls inside expander.
+      if (ev.target.closest(".expander-row")) return;
+      const tr = ev.target.closest("tr[data-account]");
+      if (!tr) return;
+      // Only expand when the click is on the account cell (first td).
+      const td = ev.target.closest("td");
+      if (!td) return;
+      const isFirstTd = tr.querySelector("td") === td;
+      const isReach = td.classList.contains("reach-cell");
+      if (!isFirstTd && !isReach) return;
+      if (isReach) return; // reach-cell handler already manages its own click
+      const acc = tr.dataset.account;
+      if (expandedDealIds.has(acc)) collapseRow(acc);
+      else expandRow(acc, !!ev.shiftKey);
+    });
+    // Keyboard nav.
+    document.addEventListener("keydown", (ev) => {
+      if (ev.key === "Escape" && expandedDealIds.size) {
+        [...expandedDealIds].forEach((id) => collapseRow(id));
+        return;
+      }
+      if (!expandedDealIds.size) return;
+      if (ev.key !== "ArrowDown" && ev.key !== "ArrowUp") return;
+      // Don't hijack when typing in an input.
+      const tag = (ev.target && ev.target.tagName) || "";
+      if (/^(INPUT|TEXTAREA|SELECT)$/i.test(tag)) return;
+      ev.preventDefault();
+      const last = [...expandedDealIds][expandedDealIds.size - 1];
+      const rows = [...tbody.querySelectorAll("tr[data-account]")];
+      const idx = rows.findIndex((r) => r.dataset.account === last);
+      if (idx === -1) return;
+      const next = ev.key === "ArrowDown" ? rows[idx + 1] : rows[idx - 1];
+      if (!next) return;
+      collapseRow(last);
+      expandRow(next.dataset.account, false);
+      // Scroll into view.
+      next.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+  }
+  function restoreExpandedAfterRender() {
+    // After renderDeals() rebuilds tbody, re-inject any persisted expansions.
+    if (!expandedDealIds.size) return;
+    if (isMobileExpand()) return;
+    const ids = [...expandedDealIds];
+    expandedDealIds.clear();
+    ids.forEach((id) => expandRow(id, true));
+  }
+
   /* ---------- BENCHMARKS (#30) ----------
      External Pavilion-style quartile placement for every KPI: turns the
      internal-only "is it changing?" dashboard into an external-context
@@ -1483,6 +1806,7 @@
       .sort((a, b) => b.amount - a.amount);
     renderDeals(rows);
     bindReachCellClicks();
+    restoreExpandedAfterRender();
   }
   function bindDealFilters() {
     ["deal-search","deal-region","deal-forecast"].forEach((id) => {
@@ -1989,7 +2313,7 @@
         biasCell = `<td><span class="bias-chip ${bm.cls}" title="${esc(tip)}">${bm.label}</span><span class="fcst-spark" aria-hidden="true">${dots}</span></td>`;
       }
       return `
-        <tr>
+        <tr data-rep="${esc(r.name)}">
           <td><b class="green">${esc(r.name)}</b></td>
           <td>${esc(r.region)}</td>
           <td class="num">$${formatK(r.quota)}</td>
@@ -2260,6 +2584,10 @@
     try {
       const bb = benchmarkInsightBullet();
       if (bb) items.unshift(bb);
+    } catch (e) {}
+    try {
+      const eb = expandedDealInsightBullet();
+      if (eb) items.unshift(eb);
     } catch (e) {}
     list.innerHTML = items.map((s) => `<li>${esc(s)}</li>`).join("");
   }
@@ -3192,6 +3520,7 @@
     renderDeals(D.topDeals.slice().sort((a,b) => b.amount - a.amount));
     bindDealFilters();
     bindMyDeals();
+    bindDealRowExpand();
     renderMomentumHeatmap();
     renderReps();
     renderAtRiskReps();

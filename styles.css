@@ -1807,3 +1807,141 @@ main.lens-mgr #benchmarks { display: none !important; }
   .bench-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   #benchmarks .panel-head .right { display: none; }
 }
+
+
+
+/* ---------- DEAL DETAIL EXPANDER (#32) ----------
+   Bloomberg DES-style inline expander on TOP OPEN DEALS rows.
+   Uses only existing CSS vars; no new colors / fonts. */
+#deals tbody tr.row-expanded { background: rgba(95,184,120,0.06); }
+#deals tbody tr.row-expanded td:first-child b { text-shadow: 0 0 0.5px currentColor; }
+#deals tbody tr[data-account] td:first-child { cursor: pointer; }
+#deals tbody tr[data-account] td:first-child:hover b { text-decoration: underline; }
+
+tr.expander-row > td {
+  padding: 0 !important;
+  background: rgba(255,255,255,0.015);
+  border-bottom: 1px solid var(--border, rgba(255,255,255,0.10));
+}
+.expander-inner {
+  padding: 10px 14px 12px;
+  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--text, #c9d1d9);
+  animation: expanderOpen 180ms ease-out;
+}
+@keyframes expanderOpen { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+@media (prefers-reduced-motion: reduce) { .expander-inner { animation: none; } }
+
+.expander-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-bottom: 8px;
+  margin-bottom: 8px;
+  border-bottom: 1px dashed var(--border, rgba(255,255,255,0.10));
+}
+.exp-head-chev { color: var(--green); }
+.exp-head-sep  { color: var(--dim); }
+.exp-head-amt  { font-weight: 700; }
+.exp-collapse-btn {
+  margin-left: auto;
+  background: transparent;
+  border: 1px solid var(--border, rgba(255,255,255,0.15));
+  color: var(--dim);
+  font-family: inherit;
+  font-size: 10.5px;
+  letter-spacing: 0.5px;
+  padding: 2px 8px;
+  cursor: pointer;
+  border-radius: 2px;
+}
+.exp-collapse-btn:hover { color: var(--text); border-color: var(--text); }
+.expander-mismatch {
+  margin-left: 6px;
+  padding: 1px 6px;
+  font-size: 10px;
+  color: var(--amber);
+  border: 1px solid rgba(210,153,34,0.40);
+  border-radius: 2px;
+  background: rgba(210,153,34,0.06);
+}
+
+.expander-grid {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr 1.2fr;
+  gap: 16px;
+}
+.expander-col-title {
+  font-size: 10px;
+  letter-spacing: 1px;
+  color: var(--dim);
+  font-weight: 600;
+  margin-bottom: 4px;
+  border-bottom: 1px dotted var(--border, rgba(255,255,255,0.10));
+  padding-bottom: 2px;
+}
+
+.expander-act-row { display: flex; gap: 8px; padding: 1px 0; }
+.exp-act-date     { color: var(--dim); width: 56px; flex: 0 0 auto; }
+.exp-act-icon     { color: var(--green-soft, #5fb878); width: 14px; flex: 0 0 auto; text-align: center; }
+.exp-act-summary  { color: var(--text, #c9d1d9); flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.expander-meddic-row { display: flex; gap: 6px; padding: 1px 0; align-items: center; }
+.expander-meddic-row.on .exp-meddic-letter { color: var(--green); font-weight: 700; }
+.expander-meddic-row.off .exp-meddic-letter { color: var(--amber); font-weight: 700; }
+.exp-meddic-letter { width: 22px; flex: 0 0 auto; text-align: center; }
+.exp-meddic-glyph  { width: 12px; flex: 0 0 auto; text-align: center; }
+.exp-meddic-glyph.green { color: var(--green); }
+.exp-meddic-glyph.amber { color: var(--amber); }
+.exp-meddic-note   { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text, #c9d1d9); }
+
+.expander-stake-row { display: flex; gap: 6px; padding: 1px 0; align-items: center; }
+.exp-stake-role    { width: 18px; color: var(--dim); flex: 0 0 auto; text-align: center; }
+.exp-stake-glyph   { width: 12px; flex: 0 0 auto; text-align: center; }
+.exp-stake-glyph.green { color: var(--green); }
+.exp-stake-glyph.amber { color: var(--amber); }
+.exp-stake-glyph.red   { color: var(--red); }
+.exp-stake-name    { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.expander-stake-row.missing .exp-stake-name { color: var(--red); opacity: 0.85; }
+.exp-stake-title   { color: var(--dim); font-size: 10.5px; }
+
+.expander-notes {
+  margin-top: 10px;
+  padding: 6px 8px;
+  background: rgba(255,255,255,0.025);
+  border-left: 2px solid var(--green-soft, #5fb878);
+  font-size: 11px;
+  line-height: 1.55;
+}
+.expander-notes b { color: var(--green-soft, #5fb878); letter-spacing: 0.5px; }
+
+.expander-actions { margin-top: 8px; display: flex; gap: 8px; justify-content: flex-end; }
+.exp-action-btn {
+  background: transparent;
+  border: 1px solid var(--border, rgba(255,255,255,0.15));
+  color: var(--green-soft, #5fb878);
+  font-family: inherit;
+  font-size: 10.5px;
+  letter-spacing: 0.5px;
+  padding: 3px 8px;
+  cursor: pointer;
+  border-radius: 2px;
+}
+.exp-action-btn:hover { color: var(--text); border-color: var(--text); }
+
+.expander-empty { color: var(--dim); font-style: italic; }
+
+/* Lens hide: BOARD doesn't get the expander */
+main.lens-board #deals tbody tr[data-account] td:first-child { cursor: default; }
+main.lens-board tr.expander-row { display: none; }
+
+/* Mobile: full-screen modal overlay instead of inline expansion */
+.deal-expand-modal { position: fixed; inset: 0; z-index: 9999; display: flex; align-items: stretch; }
+.deal-expand-modal-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,0.55); cursor: pointer; }
+.deal-expand-modal-body { position: relative; margin: auto; width: 96%; max-height: 92vh; overflow-y: auto; background: var(--bg, #0d1117); border: 1px solid var(--border, rgba(255,255,255,0.15)); padding: 8px; border-radius: 2px; }
+@media (max-width: 480px) {
+  .expander-grid { grid-template-columns: 1fr; gap: 10px; }
+  .expander-head { flex-wrap: wrap; }
+}
