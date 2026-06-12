@@ -1509,3 +1509,152 @@ main.lens-board section#inbox,
   }
   .funnel-cycle { font-size: 10.5px; }
 }
+
+
+/* ===== WIN / LOSS REASONS (#18) — the playbook hidden in losses ===== */
+.winloss-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+.winloss-half {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-1);
+  border-radius: 2px;
+}
+.winloss-half-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-family: var(--mono);
+}
+.winloss-half-title {
+  font-size: 11px;
+  letter-spacing: 0.8px;
+  font-weight: 700;
+}
+.winloss-half-title.good { color: var(--green); }
+.winloss-half-title.bad  { color: var(--red); }
+.winloss-half-sub {
+  font-size: 10.5px;
+  color: var(--dim);
+  letter-spacing: 0.4px;
+}
+.winloss-bar,
+.winloss-stage-bar,
+.winloss-comp-bar {
+  display: flex;
+  width: 100%;
+  height: 14px;
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+  background: var(--bg);
+}
+.winloss-seg {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.4px;
+  font-weight: 700;
+  color: var(--bg);
+  overflow: hidden;
+  white-space: nowrap;
+  border-right: 1px solid var(--bg-2);
+}
+.winloss-seg:last-child { border-right: 0; }
+.winloss-seg.seg-good  { background: var(--green);     }
+.winloss-seg.seg-warn  { background: var(--amber);     color: var(--bg); }
+.winloss-seg.seg-bad   { background: var(--red);       color: var(--white); }
+.winloss-seg.seg-muted { background: var(--border-2);  color: var(--white); }
+
+.winloss-list,
+.winloss-stage-list,
+.winloss-comp-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.winloss-row {
+  display: grid;
+  grid-template-columns: 12px 1fr 48px 64px;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  font-family: var(--mono);
+  font-size: 11px;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  cursor: pointer;
+}
+.winloss-stage-list .winloss-row {
+  grid-template-columns: 12px 1fr 48px 64px 68px;
+}
+.winloss-row:hover { background: var(--bg-2); border-color: var(--border); }
+.winloss-row .winloss-dot { font-size: 10px; line-height: 1; }
+.winloss-row.tone-good  .winloss-dot { color: var(--green); }
+.winloss-row.tone-warn  .winloss-dot { color: var(--amber); }
+.winloss-row.tone-bad   .winloss-dot { color: var(--red);   }
+.winloss-row.tone-muted .winloss-dot { color: var(--dim);   }
+.winloss-row .winloss-label { color: var(--white); }
+.winloss-row .winloss-pct,
+.winloss-row .winloss-amt {
+  text-align: right;
+  color: var(--green);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+.winloss-row.tone-bad  .winloss-pct,
+.winloss-row.tone-bad  .winloss-amt { color: var(--red);   }
+.winloss-row.tone-warn .winloss-pct,
+.winloss-row.tone-warn .winloss-amt { color: var(--amber); }
+.winloss-row .winloss-count {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.winloss-comp-chip {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 5px;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  color: var(--red);
+  border: 1px solid var(--red);
+  border-radius: 2px;
+  background: rgba(255, 82, 82, 0.06);
+}
+
+.winloss-sub-section {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.winloss-sub-head {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.6px;
+  color: var(--white);
+}
+.winloss-sub-head .muted { color: var(--dim); }
+
+@media (max-width: 720px) {
+  .winloss-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 480px) {
+  .winloss-row { grid-template-columns: 12px 1fr 40px 52px; font-size: 10.5px; }
+  .winloss-stage-list .winloss-row { grid-template-columns: 12px 1fr 40px 52px 56px; }
+  .winloss-seg { font-size: 9px; }
+}

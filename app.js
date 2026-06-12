@@ -2575,7 +2575,8 @@
       "GO COV": "forward-cov", "GO COVERAGE": "forward-cov", "GO FCOV": "forward-cov",
       "GO RISK": "at-risk-reps", "GO ATRISK": "at-risk-reps", "GO COACH": "at-risk-reps",
       "GO AUD": "audience", "GO AUDIENCE": "audience",
-      "GO NOTES": "release"
+      "GO NOTES": "release",
+      "GO WL": "winloss", "GO WINLOSS": "winloss", "GO WIN": "winloss"
     };
     if (goMap[cmd]) { const el = document.getElementById(goMap[cmd]); if (el) el.scrollIntoView({ behavior: "smooth", block: "start" }); return; }
     if (cmd === "FCST COMMIT" || cmd === "FORECAST COMMIT") { setSeries("commit"); return; }
@@ -2601,6 +2602,125 @@
     flash(`UNKNOWN CMD: ${cmd} · type HELP`, "err");
   }
 
+  /* ---------- WIN / LOSS REASONS (#18) ----------
+     The playbook for next quarter is hidden in this quarter's losses.
+     Renders two compact halves (WIN / LOSS) with horizontal stacked bars +
+     mini-lists, a LOSS BY STAGE sub-section (where in the funnel we leak),
+     and a COMPETITIVE SPLIT mini-bar (among "Lost to competitor" losses).
+     All competitor names are fictitious per dashboard-context.md §7. */
+  const WIN_TONES  = ["good","good","good","good","good"];          // green shades
+  const LOSS_TONES = ["bad","bad","warn","warn","warn"];             // red→amber gradient
+  const STAGE_TONES = ["warn","bad","bad","warn"];                   // emphasize discovery+proposal
+  const COMP_TONES = ["bad","warn","muted","muted"];                 // top competitor stands out
+
+  function renderWinLossBar(items, tones, hostId) {
+    const host = $(hostId);
+    if (!host) return;
+    host.innerHTML = items.map((it, i) => {
+      const t = tones[i] || "muted";
+      const label = String(it.pct) + "%";
+      return `<span class="winloss-seg seg-${t}" style="width:${it.pct}%;" title="${esc(it.reason || it.stage || it.competitor)} · ${it.pct}%">${it.pct >= 10 ? esc(label) : ""}</span>`;
+    }).join("");
+  }
+  function renderWinLossList(items, tones, hostId, kind) {
+    const host = $(hostId);
+    if (!host) return;
+    host.innerHTML = items.map((it, i) => {
+      const t = tones[i] || "muted";
+      const label = it.reason || it.stage || it.competitor;
+      const compChip = (kind === "loss" && it.primaryCompetitor)
+        ? ` <span class="winloss-comp-chip" data-competitor="${esc(it.primaryCompetitor)}" title="Top competitor for this loss reason">▸ ${esc(it.primaryCompetitor)}</span>`
+        : "";
+      const dataAttr = kind === "comp"
+        ? ` data-competitor="${esc(it.competitor)}"`
+        : ` data-reason="${esc(label)}"`;
+      return `
+        <li class="winloss-row tone-${t}"${dataAttr}>
+          <span class="winloss-dot">●</span>
+          <span class="winloss-label">${esc(label)}${compChip}</span>
+          <span class="winloss-pct num">${it.pct}%</span>
+          <span class="winloss-amt num">$${it.amount.toFixed(1)}M</span>
+        </li>`;
+    }).join("");
+  }
+  function renderWinLoss() {
+    const wl = D.winLoss;
+    if (!wl || !$("winloss")) return;
+
+    // Header micro-stat: reconciles with existing Win Rate KPI; if it drifts
+    // we render the same ⚠ MISMATCH warning pattern used by next-Q-cov (#16).
+    const stat = $("winloss-stat");
+    if (stat) {
+      const tone = wl.trendVsPrior.delta >= 0 ? "dh-good" : "dh-bad";
+      const arrow = wl.trendVsPrior.delta >= 0 ? "▲" : "▼";
+      const sign  = wl.trendVsPrior.delta >= 0 ? "+" : "";
+      // Reconcile against Win Rate KPI if present.
+      const kpiWR = (D.kpis || []).find((k) => k.label === "Win Rate (TTM)");
+      const kpiPct = kpiWR ? parseFloat(String(kpiWR.value).replace(/[^0-9.]/g,"")) : null;
+      const mismatch = (kpiPct != null && Math.abs(kpiPct - wl.trendVsPrior.currentWinRate) > 0.1)
+        ? ` · <span class="dh-bad" title="Win rate here (${wl.trendVsPrior.currentWinRate}%) does not match KPI tile (${kpiPct}%)">⚠ MISMATCH</span>`
+        : "";
+      stat.innerHTML =
+        `<span class="dh-label">WIN RATE ${esc(wl.period)}:</span> ` +
+        `<b>${wl.trendVsPrior.currentWinRate}%</b> ` +
+        `<span class="${tone}">${arrow} ${sign}${wl.trendVsPrior.delta.toFixed(1)} pts</span> ` +
+        `<span class="muted">vs prior</span> · ` +
+        `<b class="dh-good">$${wl.closedWonAmount.toFixed(1)}M WON</b> / ` +
+        `<b class="dh-bad">$${wl.closedLostAmount.toFixed(1)}M LOST</b>` +
+        mismatch;
+    }
+    // Sub-heads
+    setText("winloss-win-sub",  `${wl.closedWonCount} DEALS · $${wl.closedWonAmount.toFixed(1)}M`);
+    setText("winloss-loss-sub", `${wl.closedLostCount} DEALS · $${wl.closedLostAmount.toFixed(1)}M`);
+
+    renderWinLossBar(wl.winReasons,  WIN_TONES,  "winloss-win-bar");
+    renderWinLossBar(wl.lossReasons, LOSS_TONES, "winloss-loss-bar");
+    renderWinLossList(wl.winReasons,  WIN_TONES,  "winloss-win-list",  "win");
+    renderWinLossList(wl.lossReasons, LOSS_TONES, "winloss-loss-list", "loss");
+
+    // LOSS BY STAGE — where in the funnel we leak the most $$.
+    const stageTotal = wl.lossByStage.reduce((a, s) => a + s.amount, 0);
+    setText("winloss-stage-sub", `$${stageTotal.toFixed(1)}M ACROSS ${wl.lossByStage.length} STAGES`);
+    const stageBar = $("winloss-stage-bar");
+    if (stageBar) {
+      stageBar.innerHTML = wl.lossByStage.map((s, i) => {
+        const pct = (s.amount / stageTotal) * 100;
+        const t = STAGE_TONES[i] || "warn";
+        return `<span class="winloss-seg seg-${t}" style="width:${pct.toFixed(1)}%;" title="${esc(s.stage)} · $${s.amount.toFixed(1)}M (${s.count} deals)">${pct >= 12 ? esc(s.stage.toUpperCase()) : ""}</span>`;
+      }).join("");
+    }
+    const stageList = $("winloss-stage-list");
+    if (stageList) {
+      stageList.innerHTML = wl.lossByStage.map((s, i) => {
+        const pct = (s.amount / stageTotal) * 100;
+        const t = STAGE_TONES[i] || "warn";
+        return `
+          <li class="winloss-row tone-${t}" data-stage="${esc(s.stage)}">
+            <span class="winloss-dot">●</span>
+            <span class="winloss-label">${esc(s.stage)}</span>
+            <span class="winloss-pct num">${pct.toFixed(0)}%</span>
+            <span class="winloss-amt num">$${s.amount.toFixed(1)}M</span>
+            <span class="winloss-count num muted">${s.count} deals</span>
+          </li>`;
+      }).join("");
+    }
+
+    // COMPETITIVE SPLIT — among "Lost to competitor", who beat us.
+    renderWinLossBar(wl.competitiveSplit,  COMP_TONES, "winloss-comp-bar");
+    renderWinLossList(wl.competitiveSplit, COMP_TONES, "winloss-comp-list", "comp");
+
+    // No-op click handlers — data-attributes already in place for future
+    // drill-down. Just flash a hint so the affordance feels alive.
+    document.querySelectorAll("#winloss .winloss-row").forEach((row) => {
+      if (row.dataset.bound) return;
+      row.dataset.bound = "1";
+      row.addEventListener("click", () => {
+        const r = row.dataset.reason || row.dataset.stage || row.dataset.competitor;
+        if (r) flash(`DRILL-DOWN: ${r} (coming soon)`);
+      });
+    });
+  }
+
   /* ---------- LENS PERSONA MODES (#24) ----------
      Closes §9.2 cognitive-overload heuristic by giving each persona a
      curated subset of the 17 panels. Implementation hides via CSS class on
@@ -2620,17 +2740,17 @@
   // Each value = the set of panel IDs visible for that persona. "full" = null
   // means everything visible (no hide rules emitted).
   const LENS_MAP = {
-    cro:   new Set(["inbox","dashboard","forecast","changed","yoy","forward-cov","at-risk-reps","slippage","insights","audience","release"]),
-    mgr:   new Set(["inbox","dashboard","funnel","deals","reps","at-risk-reps","slippage","changed","insights","release"]),
+    cro:   new Set(["inbox","dashboard","forecast","changed","yoy","forward-cov","at-risk-reps","slippage","winloss","insights","audience","release"]),
+    mgr:   new Set(["inbox","dashboard","funnel","deals","reps","at-risk-reps","slippage","changed","winloss","insights","release"]),
     ae:    new Set(["inbox","dashboard","deals","insights","release"]),
-    cfo:   new Set(["dashboard","forecast","yoy","slippage","release"]),
-    cmo:   new Set(["dashboard","pipegen","funnel","segments","insights","release"]),
-    board: new Set(["dashboard","forecast","yoy","insights","release"]),
+    cfo:   new Set(["dashboard","forecast","yoy","slippage","winloss","release"]),
+    cmo:   new Set(["dashboard","pipegen","funnel","segments","winloss","insights","release"]),
+    board: new Set(["dashboard","forecast","yoy","winloss","insights","release"]),
     full:  null
   };
   const ALL_PANEL_IDS = [
     "inbox","changed","yoy","dashboard","funnel","forecast","deals","slippage",
-    "pipegen","forward-cov","at-risk-reps","reps","segments","risks","insights","audience","release"
+    "pipegen","forward-cov","at-risk-reps","reps","segments","winloss","risks","insights","audience","release"
   ];
   const LENS_SHORTCUT_ORDER = ["cro","mgr","ae","cfo","cmo","board","full"];
   const LENS_INSIGHT_INTRO = {
@@ -2793,6 +2913,7 @@
     renderSlippage();
     renderPipegen();
     renderForwardCoverage();
+    renderWinLoss();
     renderInbox();
     bindInboxFilters();
     applyLens();

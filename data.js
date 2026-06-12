@@ -186,7 +186,7 @@ window.SALESPULSE_DATA = {
     { text: "Northwind Industries — pushed close date 2x in last 30 days", severity: "High" },
     { text: "Fabrikam Logistics — no activity in 21 days at Discovery stage", severity: "High" },
     { text: "Wide World Importers — single-threaded (no champion identified)", severity: "Medium" },
-    { text: "Litware Inc. — competitor mentioned in last call notes",       severity: "Medium" },
+    { text: "Litware Inc. — Acme RevPro mentioned in last call notes (top competitor: $9.5M won against us TTM)",       severity: "Medium" },
     { text: "Avg discovery-to-proposal velocity slowing in EMEA",            severity: "Low" }
   ],
 
@@ -207,6 +207,50 @@ window.SALESPULSE_DATA = {
       { account: "Litware Inc.",          owner: "K. Yamada", region: "APAC", segment: "Enterprise",  amount:  680000, fromClose: "2026-06-22", toClose: "2026-07-20", reason: "Pricing pushback" },
       { account: "Proseware Systems",     owner: "J. Okafor", region: "NA",   segment: "Mid-Market",  amount:  540000, fromClose: "2026-06-30", toClose: "2026-08-30", reason: "Procurement delay" }
     ]
+  },
+
+  /* WIN / LOSS REASONS (#18) — TTM trailing twelve-month win/loss intelligence.
+     The playbook for next quarter is hidden in this quarter's losses. All competitor
+     names are fictitious per dashboard-context.md §7. winRate (28.4%) reconciles
+     with the existing Win Rate KPI tile so the dashboard tells a consistent story. */
+  winLoss: {
+    period: "TTM",
+    asOf:   "Jun 12, 2026",
+    closedWonCount:  312,
+    closedLostCount: 786,
+    closedWonAmount:  44.6,  // $M
+    closedLostAmount: 58.2,  // $M
+    winReasons: [
+      { reason: "Product fit / capabilities",   pct: 32, amount: 14.3 },
+      { reason: "Champion / executive sponsor", pct: 24, amount: 10.7 },
+      { reason: "Price / ROI case",             pct: 18, amount:  8.0 },
+      { reason: "Implementation speed",         pct: 14, amount:  6.2 },
+      { reason: "Integration / ecosystem fit",  pct: 12, amount:  5.4 }
+    ],
+    lossReasons: [
+      { reason: "Lost to competitor",          pct: 34, amount: 19.8, primaryCompetitor: "Acme RevPro" },
+      { reason: "No decision / status quo",    pct: 26, amount: 15.1 },
+      { reason: "Budget cut / deprioritized",  pct: 18, amount: 10.5 },
+      { reason: "Price too high",              pct: 14, amount:  8.1 },
+      { reason: "Missing capability",          pct:  8, amount:  4.7 }
+    ],
+    lossByStage: [
+      { stage: "Qualified",   amount: 14.2, count: 312 },
+      { stage: "Discovery",   amount: 18.6, count: 248 },
+      { stage: "Proposal",    amount: 16.4, count: 146 },
+      { stage: "Negotiation", amount:  9.0, count:  80 }
+    ],
+    competitiveSplit: [
+      { competitor: "Acme RevPro",     pct: 48, amount: 9.5 },
+      { competitor: "Pulsar Insights", pct: 27, amount: 5.3 },
+      { competitor: "Build in-house",  pct: 15, amount: 3.0 },
+      { competitor: "Other",           pct: 10, amount: 2.0 }
+    ],
+    trendVsPrior: {
+      currentWinRate: 28.4,
+      priorWinRate:   26.8,
+      delta:           1.6
+    }
   },
 
   /* NEXT-QUARTER COVERAGE (#16) — forward-looking pipeline by close-date quarter.
@@ -275,6 +319,7 @@ window.SALESPULSE_DATA = {
       "QUAL gap: Northwind ($2.4M @ 75% commit) scores 4/8 on MEDDIC — missing Decision Criteria, Decision Process, Champion, and Paper Process. It's the single largest un-defensible commit deal in the book and the lone WEAK-COMMIT alarm. Historical land rate on qual < 5/8 is ~35% below qual ≥ 6/8 — so projection's $59.2M midpoint is generous if Northwind doesn't tighten. Action: assign manager pipe-review to identify EB + champion + close-plan by Friday or move to bestcase.",
       "YoY same-quarter: 7 of 8 KPIs are UP vs Q2 FY25 — pipeline +17.8%, weighted +21.8%, commit @ W8 +21%, avg deal +10.9%, cycle −7 days. The lone regression is slippage at +45% YoY ($5.8M → $8.4M). The growth-quarter footprint is real, but slippage is the friction tax behind why a +21% commit feels tight at Friday call. Action: cross-reference SLIPPAGE THIS QUARTER panel for the 6 deals that drove $8.4M of out-of-period push — fix the playbook, not the forecast.",
       "Activity score for E. Sokolova (55) is below threshold — coaching candidate.",
+      "WIN/LOSS TTM: $44.6M won vs $58.2M lost — 28.4% win rate (▲+1.6 pts QoQ). 34% of lost $$ went to competitor (Acme RevPro = 48% of that = $9.5M direct), and 26% to 'no decision / status quo' — combined ~60% of losses are NOT product gaps but URGENCY + COMPETITIVE gaps. Discovery + Proposal are the leaking stages ($35M of $58.2M lost). Action: refresh Acme RevPro battlecard + tighten Discovery qualification (urgency framing + champion test).",
       "Recommended action: re-balance territory coverage in EMEA Mid-Market."
     ],
     [
